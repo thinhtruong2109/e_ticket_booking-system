@@ -5,9 +5,13 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -26,14 +30,26 @@ public class TicketExchange {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name = "ticket_listing_id", nullable = false)
-    private Long ticketListingId;
+    /**
+     * Tham chiếu đến TicketListing - vé được trao đổi
+     * BUSINESS RULE: Ticket trong TicketListing không thể:
+     * 1. Đã check-in (isCheckedIn = true)
+     * 2. Listing status phải = FOR_SALE
+     */
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "ticket_listing_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_ticket_exchanges_ticket_listing_id"))
+    private TicketListing ticketListing;
     
-    @Column(name = "seller_id", nullable = false)
-    private Long sellerId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "seller_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_ticket_exchanges_seller_id"))
+    private User seller;
     
-    @Column(name = "buyer_id", nullable = false)
-    private Long buyerId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "buyer_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_ticket_exchanges_buyer_id"))
+    private User buyer;
     
     @Column(name = "transaction_type", nullable = false, length = 20)
     private String transactionType; // PURCHASE, TRADE
@@ -41,8 +57,10 @@ public class TicketExchange {
     @Column(name = "price", precision = 10, scale = 2)
     private BigDecimal price;
     
-    @Column(name = "trade_ticket_id")
-    private Long tradeTicketId; // Vé được trao đổi nếu là TRADE
+    @ManyToOne
+    @JoinColumn(name = "trade_ticket_id",
+                foreignKey = @ForeignKey(name = "fk_ticket_exchanges_trade_ticket_id"))
+    private Ticket tradeTicket;
     
     @Column(name = "status", nullable = false, length = 20)
     private String status; // PENDING, PAYMENT_PENDING, COMPLETED, CANCELLED, FAILED
@@ -50,8 +68,10 @@ public class TicketExchange {
     @Column(name = "payment_method", length = 50)
     private String paymentMethod; // VNPAY, MOMO, STRIPE, DIRECT_TRADE
     
-    @Column(name = "payment_id")
-    private Long paymentId;
+    @OneToOne
+    @JoinColumn(name = "payment_id",
+                foreignKey = @ForeignKey(name = "fk_ticket_exchanges_payment_id"))
+    private Payment payment;
     
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

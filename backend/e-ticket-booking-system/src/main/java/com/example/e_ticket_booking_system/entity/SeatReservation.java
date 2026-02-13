@@ -4,9 +4,10 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -22,17 +23,25 @@ import lombok.NoArgsConstructor;
 public class SeatReservation {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "seat_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_seat_reservations_seat_id"))
+    private Seat seat;
     
-    @Column(name = "seat_id", nullable = false)
-    private Long seatId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "event_schedule_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_seat_reservations_event_schedule_id"))
+    private EventSchedule eventSchedule;
     
-    @Column(name = "event_schedule_id", nullable = false)
-    private Long eventScheduleId;
+    @ManyToOne
+    @JoinColumn(name = "booking_id",
+                foreignKey = @ForeignKey(name = "fk_seat_reservations_booking_id"))
+    private Booking booking;
     
-    @Column(name = "booking_id")
-    private Long bookingId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "user_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_seat_reservations_user_id"))
+    private User usergId;
     
     @Column(name = "user_id", nullable = false)
     private Long userId;

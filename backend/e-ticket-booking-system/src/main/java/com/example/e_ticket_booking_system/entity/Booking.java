@@ -5,9 +5,12 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -29,14 +32,20 @@ public class Booking {
     @Column(name = "booking_code", nullable = false, unique = true, length = 20)
     private String bookingCode;
     
-    @Column(name = "customer_id", nullable = false)
-    private Long customerId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "customer_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_bookings_customer_id"))
+    private User customer;
     
-    @Column(name = "event_id", nullable = false)
-    private Long eventId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "event_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_bookings_event_id"))
+    private Event event;
     
-    @Column(name = "schedule_id")
-    private Long scheduleId;
+    @ManyToOne
+    @JoinColumn(name = "schedule_id",
+                foreignKey = @ForeignKey(name = "fk_bookings_schedule_id"))
+    private EventSchedule schedule;
     
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;

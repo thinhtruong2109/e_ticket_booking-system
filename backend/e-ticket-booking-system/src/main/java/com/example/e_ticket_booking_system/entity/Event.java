@@ -4,9 +4,12 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -31,14 +34,20 @@ public class Event {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     
-    @Column(name = "category_id", nullable = false)
-    private Long categoryId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "category_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_events_category_id"))
+    private EventCategory category;
     
-    @Column(name = "organizer_id", nullable = false)
-    private Long organizerId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "organizer_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_events_organizer_id"))
+    private User organizer;
     
-    @Column(name = "venue_id", nullable = false)
-    private Long venueId;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "venue_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_events_venue_id"))
+    private Venue venue;
     
     @Column(name = "banner_image_url", length = 500)
     private String bannerImageUrl;
@@ -55,6 +64,15 @@ public class Event {
     @Column(name = "available_tickets")
     private Integer availableTickets;
     
+    /**
+     * Flag kiểm soát secondary market (sàn trao đổi vé)
+     * - true: Cho phép người dùng trao đổi/bán vé
+     * - false: Vé không thể transfer (event VIP/restricted)
+     * 
+     * Impact: 
+     * - Event.allowTicketExchange = false → Ticket.isTransferable = false
+     * - Event.allowTicketExchange = true → Ticket.isTransferable phụ thuộc TicketType setting
+     */
     @Column(name = "allow_ticket_exchange")
     private Boolean allowTicketExchange;
     

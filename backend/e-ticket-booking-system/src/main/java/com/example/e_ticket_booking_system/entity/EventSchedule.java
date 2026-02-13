@@ -4,9 +4,12 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -22,8 +25,10 @@ import lombok.NoArgsConstructor;
 public class EventSchedule {
     
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "event_id", nullable = false,
+                foreignKey = @ForeignKey(name = "fk_event_schedules_event_id"))
+    private Event event
     
     @Column(name = "event_id", nullable = false)
     private Long eventId;

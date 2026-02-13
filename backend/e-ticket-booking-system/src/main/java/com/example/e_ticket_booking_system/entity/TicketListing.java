@@ -5,9 +5,12 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -25,9 +28,17 @@ public class TicketListing {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    @Column(name = "ticket_id", nullable = false, unique = true)
-    private Long ticketId;
+        /**
+     * FOREIGN KEY CONSTRAINT: ticket_id
+     * BUSINESS RULE: Ticket không thể listed nếu:
+     * 1. Ticket.isCheckedIn = true (vé đã sử dụng)
+     * 2. Ticket.isTransferable = false (vé không được phép chuyển nhượng)
+     * 
+     * Validation: Phải được kiểm tra tại Service Layer trước khi persist
+     */    @ManyToOne(optional = false)
+    @JoinColumn(name = "ticket_id", nullable = false, 
+                foreignKey = @ForeignKey(name = "fk_ticket_listings_ticket_id"))
+    private Ticket ticket;
     
     @Column(name = "seller_id", nullable = false)
     private Long sellerId;

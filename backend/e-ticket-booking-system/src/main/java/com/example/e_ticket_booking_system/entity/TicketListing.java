@@ -1,5 +1,6 @@
 package com.example.e_ticket_booking_system.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
@@ -15,48 +16,39 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "events")
+@Table(name = "ticket_listings")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Event {
+public class TicketListing {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name = "name", nullable = false, length = 200)
-    private String name;
+    @Column(name = "ticket_id", nullable = false, unique = true)
+    private Long ticketId;
+    
+    @Column(name = "seller_id", nullable = false)
+    private Long sellerId;
+    
+    @Column(name = "listing_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal listingPrice;
+    
+    @Column(name = "exchange_type", nullable = false, length = 20)
+    private String exchangeType; // SELL, TRADE, BOTH
     
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
     
-    @Column(name = "category_id", nullable = false)
-    private Long categoryId;
-    
-    @Column(name = "organizer_id", nullable = false)
-    private Long organizerId;
-    
-    @Column(name = "venue_id", nullable = false)
-    private Long venueId;
-    
-    @Column(name = "banner_image_url", length = 500)
-    private String bannerImageUrl;
-    
-    @Column(name = "thumbnail_image_url", length = 500)
-    private String thumbnailImageUrl;
-    
     @Column(name = "status", nullable = false, length = 20)
-    private String status; // DRAFT, PUBLISHED, ONGOING, COMPLETED, CANCELLED
+    private String status; // FOR_SALE, SOLD, CANCELLED, EXPIRED
     
-    @Column(name = "total_tickets")
-    private Integer totalTickets;
+    @Column(name = "listed_at", nullable = false)
+    private LocalDateTime listedAt;
     
-    @Column(name = "available_tickets")
-    private Integer availableTickets;
-    
-    @Column(name = "allow_ticket_exchange")
-    private Boolean allowTicketExchange;
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
     
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -68,8 +60,8 @@ public class Event {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (allowTicketExchange == null) {
-            allowTicketExchange = true;
+        if (listedAt == null) {
+            listedAt = LocalDateTime.now();
         }
     }
     

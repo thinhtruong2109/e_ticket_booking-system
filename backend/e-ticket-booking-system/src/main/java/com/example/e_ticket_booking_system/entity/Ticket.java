@@ -37,6 +37,12 @@ public class Ticket {
     @Column(name = "qr_code", nullable = false, unique = true, columnDefinition = "TEXT")
     private String qrCode;
     
+    @Column(name = "current_owner_id", nullable = false)
+    private Long currentOwnerId;
+    
+    @Column(name = "is_transferable")
+    private Boolean isTransferable;
+    
     @Column(name = "is_checked_in")
     private Boolean isCheckedIn;
     
@@ -58,6 +64,9 @@ public class Ticket {
         updatedAt = LocalDateTime.now();
         if (isCheckedIn == null) {
             isCheckedIn = false;
+        }
+        if (isTransferable == null) {
+            isTransferable = true;
         }
     }
     

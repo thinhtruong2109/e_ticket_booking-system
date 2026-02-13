@@ -1,5 +1,6 @@
 package com.example.e_ticket_booking_system.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
@@ -15,48 +16,45 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "events")
+@Table(name = "ticket_exchanges")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Event {
+public class TicketExchange {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name = "name", nullable = false, length = 200)
-    private String name;
+    @Column(name = "ticket_listing_id", nullable = false)
+    private Long ticketListingId;
     
-    @Column(name = "description", columnDefinition = "TEXT")
-    private String description;
+    @Column(name = "seller_id", nullable = false)
+    private Long sellerId;
     
-    @Column(name = "category_id", nullable = false)
-    private Long categoryId;
+    @Column(name = "buyer_id", nullable = false)
+    private Long buyerId;
     
-    @Column(name = "organizer_id", nullable = false)
-    private Long organizerId;
+    @Column(name = "transaction_type", nullable = false, length = 20)
+    private String transactionType; // PURCHASE, TRADE
     
-    @Column(name = "venue_id", nullable = false)
-    private Long venueId;
+    @Column(name = "price", precision = 10, scale = 2)
+    private BigDecimal price;
     
-    @Column(name = "banner_image_url", length = 500)
-    private String bannerImageUrl;
-    
-    @Column(name = "thumbnail_image_url", length = 500)
-    private String thumbnailImageUrl;
+    @Column(name = "trade_ticket_id")
+    private Long tradeTicketId; // Vé được trao đổi nếu là TRADE
     
     @Column(name = "status", nullable = false, length = 20)
-    private String status; // DRAFT, PUBLISHED, ONGOING, COMPLETED, CANCELLED
+    private String status; // PENDING, PAYMENT_PENDING, COMPLETED, CANCELLED, FAILED
     
-    @Column(name = "total_tickets")
-    private Integer totalTickets;
+    @Column(name = "payment_method", length = 50)
+    private String paymentMethod; // VNPAY, MOMO, STRIPE, DIRECT_TRADE
     
-    @Column(name = "available_tickets")
-    private Integer availableTickets;
+    @Column(name = "payment_id")
+    private Long paymentId;
     
-    @Column(name = "allow_ticket_exchange")
-    private Boolean allowTicketExchange;
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
     
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -64,13 +62,13 @@ public class Event {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+    
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (allowTicketExchange == null) {
-            allowTicketExchange = true;
-        }
     }
     
     @PreUpdate

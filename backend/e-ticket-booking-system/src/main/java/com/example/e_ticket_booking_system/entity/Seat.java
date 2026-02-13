@@ -25,6 +25,9 @@ import lombok.NoArgsConstructor;
 public class Seat {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
     @ManyToOne(optional = false)
     @JoinColumn(name = "venue_id", nullable = false,
                 foreignKey = @ForeignKey(name = "fk_seats_venue_id"))
@@ -33,10 +36,7 @@ public class Seat {
     @ManyToOne
     @JoinColumn(name = "section_id",
                 foreignKey = @ForeignKey(name = "fk_seats_section_id"))
-    private Section section
-    
-    @Column(name = "section_id")
-    private Long sectionId;
+    private Section section;
     
     @Column(name = "row_number", length = 10)
     private String rowNumber;

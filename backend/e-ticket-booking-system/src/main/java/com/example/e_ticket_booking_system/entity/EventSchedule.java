@@ -25,13 +25,13 @@ import lombok.NoArgsConstructor;
 public class EventSchedule {
     
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
     @ManyToOne(optional = false)
     @JoinColumn(name = "event_id", nullable = false,
                 foreignKey = @ForeignKey(name = "fk_event_schedules_event_id"))
-    private Event event
-    
-    @Column(name = "event_id", nullable = false)
-    private Long eventId;
+    private Event event;
     
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;

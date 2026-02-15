@@ -1,7 +1,8 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,21 +25,32 @@ public class VenueService {
     private final VenueRepository venueRepository;
 
     public List<VenueResponse> getAllVenues() {
-        return venueRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<Venue> venues = venueRepository.findAll();
+        List<VenueResponse> responseList = new ArrayList<>();
+        for (Venue venue : venues) {
+            VenueResponse response = toResponse(venue);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public VenueResponse getVenueById(Long id) {
-        Venue venue = venueRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Venue not found with id: " + id));
+        Optional<Venue> optionalVenue = venueRepository.findById(id);
+        if (!optionalVenue.isPresent()) {
+            throw new ResourceNotFoundException("Venue not found with id: " + id);
+        }
+        Venue venue = optionalVenue.get();
         return toResponse(venue);
     }
 
     public List<VenueResponse> getVenuesByCity(String city) {
-        return venueRepository.findByCity(city).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<Venue> venues = venueRepository.findByCity(city);
+        List<VenueResponse> responseList = new ArrayList<>();
+        for (Venue venue : venues) {
+            VenueResponse response = toResponse(venue);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public VenueResponse createVenue(CreateVenueRequest request) {
@@ -48,7 +60,13 @@ public class VenueService {
         venue.setCity(request.getCity());
         venue.setCountry(request.getCountry());
         venue.setTotalCapacity(request.getTotalCapacity());
-        venue.setHasSeatMap(request.getHasSeatMap() != null ? request.getHasSeatMap() : false);
+
+        // Xác định hasSeatMap: mặc định là false
+        if (request.getHasSeatMap() != null) {
+            venue.setHasSeatMap(request.getHasSeatMap());
+        } else {
+            venue.setHasSeatMap(false);
+        }
 
         venue = venueRepository.save(venue);
         log.info("Venue created: {}", venue.getName());
@@ -56,8 +74,11 @@ public class VenueService {
     }
 
     public VenueResponse updateVenue(Long id, CreateVenueRequest request) {
-        Venue venue = venueRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Venue not found with id: " + id));
+        Optional<Venue> optionalVenue = venueRepository.findById(id);
+        if (!optionalVenue.isPresent()) {
+            throw new ResourceNotFoundException("Venue not found with id: " + id);
+        }
+        Venue venue = optionalVenue.get();
 
         if (request.getName() != null) venue.setName(request.getName());
         if (request.getAddress() != null) venue.setAddress(request.getAddress());

@@ -1,7 +1,8 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,14 +42,26 @@ public class EventService {
     private final BookingRepository bookingRepository;
 
     public EventResponse createEvent(Long organizerId, CreateEventRequest request) {
-        User organizer = userRepository.findById(organizerId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + organizerId));
+        // Tìm organizer theo ID
+        Optional<User> optionalOrganizer = userRepository.findById(organizerId);
+        if (!optionalOrganizer.isPresent()) {
+            throw new ResourceNotFoundException("User not found with id: " + organizerId);
+        }
+        User organizer = optionalOrganizer.get();
 
-        EventCategory category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + request.getCategoryId()));
+        // Tìm category theo ID
+        Optional<EventCategory> optionalCategory = categoryRepository.findById(request.getCategoryId());
+        if (!optionalCategory.isPresent()) {
+            throw new ResourceNotFoundException("Category not found with id: " + request.getCategoryId());
+        }
+        EventCategory category = optionalCategory.get();
 
-        Venue venue = venueRepository.findById(request.getVenueId())
-                .orElseThrow(() -> new ResourceNotFoundException("Venue not found with id: " + request.getVenueId()));
+        // Tìm venue theo ID
+        Optional<Venue> optionalVenue = venueRepository.findById(request.getVenueId());
+        if (!optionalVenue.isPresent()) {
+            throw new ResourceNotFoundException("Venue not found with id: " + request.getVenueId());
+        }
+        Venue venue = optionalVenue.get();
 
         Event event = new Event();
         event.setName(request.getName());
@@ -59,10 +72,23 @@ public class EventService {
         event.setBannerImageUrl(request.getBannerImageUrl());
         event.setThumbnailImageUrl(request.getThumbnailImageUrl());
         event.setStatus("DRAFT");
-        event.setTotalTickets(request.getTotalTickets() != null ? request.getTotalTickets() : 
-                             venue.getTotalCapacity() != null ? venue.getTotalCapacity() : 0);
-        event.setAvailableTickets(event.getTotalTickets());
-        event.setAllowTicketExchange(request.getAllowTicketExchange() != null ? request.getAllowTicketExchange() : true);
+
+        // Xác định totalTickets: ưu tiên từ request, nếu không thì lấy từ venue capacity
+        int totalTickets = 0;
+        if (request.getTotalTickets() != null) {
+            totalTickets = request.getTotalTickets();
+        } else if (venue.getTotalCapacity() != null) {
+            totalTickets = venue.getTotalCapacity();
+        }
+        event.setTotalTickets(totalTickets);
+        event.setAvailableTickets(totalTickets);
+
+        // Xác định allowTicketExchange
+        if (request.getAllowTicketExchange() != null) {
+            event.setAllowTicketExchange(request.getAllowTicketExchange());
+        } else {
+            event.setAllowTicketExchange(true);
+        }
 
         event = eventRepository.save(event);
         log.info("Event created: {} by organizer: {}", event.getName(), organizer.getEmail());
@@ -91,21 +117,33 @@ public class EventService {
     }
 
     public List<EventResponse> getPublishedEvents(Long categoryId, String name) {
-        return eventRepository.searchEvents("PUBLISHED", categoryId, name).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<Event> events = eventRepository.searchEvents("PUBLISHED", categoryId, name);
+        // Chuyển từ danh sách Event sang danh sách EventResponse
+        List<EventResponse> responseList = new ArrayList<>();
+        for (Event event : events) {
+            EventResponse response = toResponse(event);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public EventResponse getEventById(Long id) {
-        Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Event not found with id: " + id));
+        Optional<Event> optionalEvent = eventRepository.findById(id);
+        if (!optionalEvent.isPresent()) {
+            throw new ResourceNotFoundException("Event not found with id: " + id);
+        }
+        Event event = optionalEvent.get();
         return toResponse(event);
     }
 
     public List<EventResponse> getEventsByOrganizer(Long organizerId) {
-        return eventRepository.findByOrganizerId(organizerId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<Event> events = eventRepository.findByOrganizerId(organizerId);
+        List<EventResponse> responseList = new ArrayList<>();
+        for (Event event : events) {
+            EventResponse response = toResponse(event);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public EventResponse updateEvent(Long eventId, Long organizerId, UpdateEventRequest request) {
@@ -117,8 +155,11 @@ public class EventService {
         if (request.getName() != null) event.setName(request.getName());
         if (request.getDescription() != null) event.setDescription(request.getDescription());
         if (request.getCategoryId() != null) {
-            EventCategory category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+            Optional<EventCategory> optionalCat = categoryRepository.findById(request.getCategoryId());
+            if (!optionalCat.isPresent()) {
+                throw new ResourceNotFoundException("Category not found");
+            }
+            EventCategory category = optionalCat.get();
             event.setCategory(category);
         }
         if (request.getBannerImageUrl() != null) event.setBannerImageUrl(request.getBannerImageUrl());
@@ -132,14 +173,21 @@ public class EventService {
 
     // Admin methods
     public List<EventResponse> getAllEvents() {
-        return eventRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<Event> events = eventRepository.findAll();
+        List<EventResponse> responseList = new ArrayList<>();
+        for (Event event : events) {
+            EventResponse response = toResponse(event);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     private Event getEventAndCheckOwner(Long eventId, Long organizerId) {
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResourceNotFoundException("Event not found with id: " + eventId));
+        Optional<Event> optionalEvent = eventRepository.findById(eventId);
+        if (!optionalEvent.isPresent()) {
+            throw new ResourceNotFoundException("Event not found with id: " + eventId);
+        }
+        Event event = optionalEvent.get();
 
         if (!event.getOrganizer().getId().equals(organizerId)) {
             throw new ForbiddenException("You don't have permission to modify this event");

@@ -1,7 +1,8 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,8 +37,11 @@ public class SeatService {
 
     // Section methods
     public SectionResponse createSection(CreateSectionRequest request) {
-        Venue venue = venueRepository.findById(request.getVenueId())
-                .orElseThrow(() -> new ResourceNotFoundException("Venue not found with id: " + request.getVenueId()));
+        Optional<Venue> optionalVenue = venueRepository.findById(request.getVenueId());
+        if (!optionalVenue.isPresent()) {
+            throw new ResourceNotFoundException("Venue not found with id: " + request.getVenueId());
+        }
+        Venue venue = optionalVenue.get();
 
         Section section = new Section();
         section.setVenue(venue);
@@ -52,25 +56,41 @@ public class SeatService {
     }
 
     public List<SectionResponse> getSectionsByVenue(Long venueId) {
-        return sectionRepository.findByVenueId(venueId).stream()
-                .map(this::toSectionResponse)
-                .collect(Collectors.toList());
+        List<Section> sections = sectionRepository.findByVenueId(venueId);
+        List<SectionResponse> responseList = new ArrayList<>();
+        for (Section section : sections) {
+            SectionResponse response = toSectionResponse(section);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     // Seat methods
     public SeatResponse createSeat(CreateSeatRequest request) {
-        Venue venue = venueRepository.findById(request.getVenueId())
-                .orElseThrow(() -> new ResourceNotFoundException("Venue not found with id: " + request.getVenueId()));
+        Optional<Venue> optionalVenue = venueRepository.findById(request.getVenueId());
+        if (!optionalVenue.isPresent()) {
+            throw new ResourceNotFoundException("Venue not found with id: " + request.getVenueId());
+        }
+        Venue venue = optionalVenue.get();
 
         Seat seat = new Seat();
         seat.setVenue(venue);
         seat.setRowNumber(request.getRowNumber());
         seat.setSeatNumber(request.getSeatNumber());
-        seat.setSeatType(request.getSeatType() != null ? request.getSeatType() : "REGULAR");
+
+        // Xác định loại ghế: mặc định là REGULAR
+        if (request.getSeatType() != null) {
+            seat.setSeatType(request.getSeatType());
+        } else {
+            seat.setSeatType("REGULAR");
+        }
 
         if (request.getSectionId() != null) {
-            Section section = sectionRepository.findById(request.getSectionId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Section not found with id: " + request.getSectionId()));
+            Optional<Section> optionalSection = sectionRepository.findById(request.getSectionId());
+            if (!optionalSection.isPresent()) {
+                throw new ResourceNotFoundException("Section not found with id: " + request.getSectionId());
+            }
+            Section section = optionalSection.get();
             seat.setSection(section);
         }
 
@@ -80,40 +100,49 @@ public class SeatService {
     }
 
     public List<SeatResponse> getSeatsByVenue(Long venueId) {
-        return seatRepository.findByVenueId(venueId).stream()
-                .map(s -> toSeatResponse(s, true))
-                .collect(Collectors.toList());
+        List<Seat> seats = seatRepository.findByVenueId(venueId);
+        List<SeatResponse> responseList = new ArrayList<>();
+        for (Seat s : seats) {
+            SeatResponse response = toSeatResponse(s, true);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public List<SeatResponse> getAvailableSeats(Long eventScheduleId) {
-        // Get all reserved seat IDs for this schedule
-        List<Long> reservedSeatIds = seatReservationRepository
-                .findByEventScheduleIdAndStatus(eventScheduleId, "HOLDING")
-                .stream()
-                .map(r -> r.getSeat().getId())
-                .collect(Collectors.toList());
+        // Lấy danh sách các seat ID đã bị đặt (HOLDING và CONFIRMED)
+        List<SeatReservation> holdingReservations = seatReservationRepository
+                .findByEventScheduleIdAndStatus(eventScheduleId, "HOLDING");
+        List<SeatReservation> confirmedReservations = seatReservationRepository
+                .findByEventScheduleIdAndStatus(eventScheduleId, "CONFIRMED");
 
-        List<Long> confirmedSeatIds = seatReservationRepository
-                .findByEventScheduleIdAndStatus(eventScheduleId, "CONFIRMED")
-                .stream()
-                .map(r -> r.getSeat().getId())
-                .collect(Collectors.toList());
+        // Thu thập tất cả seat ID đã bị đặt vào một danh sách
+        List<Long> reservedSeatIds = new ArrayList<>();
+        for (SeatReservation r : holdingReservations) {
+            reservedSeatIds.add(r.getSeat().getId());
+        }
+        for (SeatReservation r : confirmedReservations) {
+            reservedSeatIds.add(r.getSeat().getId());
+        }
 
-        reservedSeatIds.addAll(confirmedSeatIds);
-
-        // We need the schedule to find the venue
-        // For simplicity, get all reservations and find venue from there
+        // Tìm venue từ các reservation
         List<SeatReservation> reservations = seatReservationRepository.findByEventScheduleId(eventScheduleId);
         if (reservations.isEmpty()) {
-            return List.of();
+            return new ArrayList<>();
         }
 
         Long venueId = reservations.get(0).getSeat().getVenue().getId();
         List<Seat> allSeats = seatRepository.findByVenueId(venueId);
 
-        return allSeats.stream()
-                .map(seat -> toSeatResponse(seat, !reservedSeatIds.contains(seat.getId())))
-                .collect(Collectors.toList());
+        // Kiểm tra từng seat có available không
+        List<SeatResponse> responseList = new ArrayList<>();
+        for (Seat seat : allSeats) {
+            boolean isReserved = reservedSeatIds.contains(seat.getId());
+            boolean isAvailable = !isReserved;
+            SeatResponse response = toSeatResponse(seat, isAvailable);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     private SectionResponse toSectionResponse(Section section) {
@@ -124,10 +153,17 @@ public class SeatService {
     }
 
     private SeatResponse toSeatResponse(Seat seat, boolean available) {
+        // Lấy sectionId và sectionName nếu có
+        Long sectionId = null;
+        String sectionName = null;
+        if (seat.getSection() != null) {
+            sectionId = seat.getSection().getId();
+            sectionName = seat.getSection().getName();
+        }
+
         return new SeatResponse(
                 seat.getId(), seat.getVenue().getId(),
-                seat.getSection() != null ? seat.getSection().getId() : null,
-                seat.getSection() != null ? seat.getSection().getName() : null,
+                sectionId, sectionName,
                 seat.getRowNumber(), seat.getSeatNumber(),
                 seat.getSeatType(), available);
     }

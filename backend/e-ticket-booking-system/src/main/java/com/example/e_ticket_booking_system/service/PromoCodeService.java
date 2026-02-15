@@ -1,8 +1,9 @@
 package com.example.e_ticket_booking_system.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,26 +54,40 @@ public class PromoCodeService {
     }
 
     public List<PromoCodeResponse> getAllPromoCodes() {
-        return promoCodeRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<PromoCode> promos = promoCodeRepository.findAll();
+        List<PromoCodeResponse> responseList = new ArrayList<>();
+        for (PromoCode promo : promos) {
+            PromoCodeResponse response = toResponse(promo);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public List<PromoCodeResponse> getActivePromoCodes() {
-        return promoCodeRepository.findByStatus("ACTIVE").stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<PromoCode> activePromos = promoCodeRepository.findByStatus("ACTIVE");
+        List<PromoCodeResponse> responseList = new ArrayList<>();
+        for (PromoCode promo : activePromos) {
+            PromoCodeResponse response = toResponse(promo);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public PromoCodeResponse getPromoCodeById(Long id) {
-        PromoCode promo = promoCodeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Promo code not found"));
+        Optional<PromoCode> optionalPromo = promoCodeRepository.findById(id);
+        if (!optionalPromo.isPresent()) {
+            throw new ResourceNotFoundException("Promo code not found");
+        }
+        PromoCode promo = optionalPromo.get();
         return toResponse(promo);
     }
 
     public PromoCodeResponse deactivatePromoCode(Long id) {
-        PromoCode promo = promoCodeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Promo code not found"));
+        Optional<PromoCode> optionalPromo = promoCodeRepository.findById(id);
+        if (!optionalPromo.isPresent()) {
+            throw new ResourceNotFoundException("Promo code not found");
+        }
+        PromoCode promo = optionalPromo.get();
         promo.setStatus("DISABLED");
         promoCodeRepository.save(promo);
         log.info("Promo code deactivated: {}", promo.getCode());

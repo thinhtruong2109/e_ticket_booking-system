@@ -1,7 +1,8 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,11 +13,20 @@ import com.example.e_ticket_booking_system.dto.request.CreateTicketExchangeReque
 import com.example.e_ticket_booking_system.dto.request.CreateTicketListingRequest;
 import com.example.e_ticket_booking_system.dto.response.TicketExchangeResponse;
 import com.example.e_ticket_booking_system.dto.response.TicketListingResponse;
-import com.example.e_ticket_booking_system.entity.*;
+import com.example.e_ticket_booking_system.entity.Event;
+import com.example.e_ticket_booking_system.entity.Ticket;
+import com.example.e_ticket_booking_system.entity.TicketExchange;
+import com.example.e_ticket_booking_system.entity.TicketListing;
+import com.example.e_ticket_booking_system.entity.TicketTransferLog;
+import com.example.e_ticket_booking_system.entity.User;
 import com.example.e_ticket_booking_system.exception.BadRequestException;
 import com.example.e_ticket_booking_system.exception.ForbiddenException;
 import com.example.e_ticket_booking_system.exception.ResourceNotFoundException;
-import com.example.e_ticket_booking_system.repository.*;
+import com.example.e_ticket_booking_system.repository.TicketExchangeRepository;
+import com.example.e_ticket_booking_system.repository.TicketListingRepository;
+import com.example.e_ticket_booking_system.repository.TicketRepository;
+import com.example.e_ticket_booking_system.repository.TicketTransferLogRepository;
+import com.example.e_ticket_booking_system.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -36,8 +46,12 @@ public class TicketExchangeService {
 
     @Transactional
     public TicketListingResponse createListing(Long sellerId, CreateTicketListingRequest request) {
-        Ticket ticket = ticketRepository.findById(request.getTicketId())
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+        // Tìm ticket theo ID
+        Optional<Ticket> optionalTicket = ticketRepository.findById(request.getTicketId());
+        if (!optionalTicket.isPresent()) {
+            throw new ResourceNotFoundException("Ticket not found");
+        }
+        Ticket ticket = optionalTicket.get();
 
         if (!ticket.getCurrentOwner().getId().equals(sellerId)) {
             throw new ForbiddenException("You don't own this ticket");
@@ -66,7 +80,13 @@ public class TicketExchangeService {
         listing.setTicket(ticket);
         listing.setSellerId(sellerId);
         listing.setListingPrice(request.getListingPrice());
-        listing.setExchangeType(request.getExchangeType() != null ? request.getExchangeType() : "SELL");
+
+        // Xác định loại exchange
+        if (request.getExchangeType() != null) {
+            listing.setExchangeType(request.getExchangeType());
+        } else {
+            listing.setExchangeType("SELL");
+        }
         listing.setDescription(request.getDescription());
         listing.setStatus("FOR_SALE");
         listing.setListedAt(LocalDateTime.now());
@@ -78,27 +98,41 @@ public class TicketExchangeService {
     }
 
     public List<TicketListingResponse> getActiveListings() {
-        return listingRepository.findByStatus("FOR_SALE").stream()
-                .map(this::toListingResponse)
-                .collect(Collectors.toList());
+        List<TicketListing> listings = listingRepository.findByStatus("FOR_SALE");
+        List<TicketListingResponse> responseList = new ArrayList<>();
+        for (TicketListing listing : listings) {
+            TicketListingResponse response = toListingResponse(listing);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public List<TicketListingResponse> getListingsBySeller(Long sellerId) {
-        return listingRepository.findBySellerId(sellerId).stream()
-                .map(this::toListingResponse)
-                .collect(Collectors.toList());
+        List<TicketListing> listings = listingRepository.findBySellerId(sellerId);
+        List<TicketListingResponse> responseList = new ArrayList<>();
+        for (TicketListing listing : listings) {
+            TicketListingResponse response = toListingResponse(listing);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public TicketListingResponse getListingById(Long id) {
-        TicketListing listing = listingRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Listing not found"));
+        Optional<TicketListing> optionalListing = listingRepository.findById(id);
+        if (!optionalListing.isPresent()) {
+            throw new ResourceNotFoundException("Listing not found");
+        }
+        TicketListing listing = optionalListing.get();
         return toListingResponse(listing);
     }
 
     @Transactional
     public void cancelListing(Long listingId, Long sellerId) {
-        TicketListing listing = listingRepository.findById(listingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Listing not found"));
+        Optional<TicketListing> optionalListing = listingRepository.findById(listingId);
+        if (!optionalListing.isPresent()) {
+            throw new ResourceNotFoundException("Listing not found");
+        }
+        TicketListing listing = optionalListing.get();
 
         if (!listing.getSellerId().equals(sellerId)) {
             throw new ForbiddenException("You don't own this listing");
@@ -111,8 +145,11 @@ public class TicketExchangeService {
 
     @Transactional
     public TicketExchangeResponse createExchange(Long buyerId, CreateTicketExchangeRequest request) {
-        TicketListing listing = listingRepository.findById(request.getTicketListingId())
-                .orElseThrow(() -> new ResourceNotFoundException("Listing not found"));
+        Optional<TicketListing> optionalListing = listingRepository.findById(request.getTicketListingId());
+        if (!optionalListing.isPresent()) {
+            throw new ResourceNotFoundException("Listing not found");
+        }
+        TicketListing listing = optionalListing.get();
 
         if (!"FOR_SALE".equals(listing.getStatus())) {
             throw new BadRequestException("Listing is no longer available");
@@ -122,13 +159,26 @@ public class TicketExchangeService {
             throw new BadRequestException("You cannot buy your own listing");
         }
 
-        User buyer = userRepository.findById(buyerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Buyer not found"));
+        // Tìm buyer và seller
+        Optional<User> optionalBuyer = userRepository.findById(buyerId);
+        if (!optionalBuyer.isPresent()) {
+            throw new ResourceNotFoundException("Buyer not found");
+        }
+        User buyer = optionalBuyer.get();
 
-        User seller = userRepository.findById(listing.getSellerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Seller not found"));
+        Optional<User> optionalSeller = userRepository.findById(listing.getSellerId());
+        if (!optionalSeller.isPresent()) {
+            throw new ResourceNotFoundException("Seller not found");
+        }
+        User seller = optionalSeller.get();
 
-        String txType = request.getTransactionType() != null ? request.getTransactionType() : "PURCHASE";
+        // Xác định loại giao dịch
+        String txType;
+        if (request.getTransactionType() != null) {
+            txType = request.getTransactionType();
+        } else {
+            txType = "PURCHASE";
+        }
 
         TicketExchange exchange = new TicketExchange();
         exchange.setTicketListing(listing);
@@ -142,8 +192,12 @@ public class TicketExchangeService {
             if (request.getTradeTicketId() == null) {
                 throw new BadRequestException("Trade ticket ID is required for trade transactions");
             }
-            Ticket tradeTicket = ticketRepository.findById(request.getTradeTicketId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Trade ticket not found"));
+            Ticket tradeTicket = null;
+            Optional<Ticket> optionalTradeTicket = ticketRepository.findById(request.getTradeTicketId());
+            if (!optionalTradeTicket.isPresent()) {
+                throw new ResourceNotFoundException("Trade ticket not found");
+            }
+            tradeTicket = optionalTradeTicket.get();
 
             if (!tradeTicket.getCurrentOwner().getId().equals(buyerId)) {
                 throw new ForbiddenException("You don't own the trade ticket");
@@ -166,8 +220,11 @@ public class TicketExchangeService {
 
     @Transactional
     public TicketExchangeResponse completeExchange(Long exchangeId) {
-        TicketExchange exchange = exchangeRepository.findById(exchangeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Exchange not found"));
+        Optional<TicketExchange> optionalExchange = exchangeRepository.findById(exchangeId);
+        if (!optionalExchange.isPresent()) {
+            throw new ResourceNotFoundException("Exchange not found");
+        }
+        TicketExchange exchange = optionalExchange.get();
 
         if (!"PENDING".equals(exchange.getStatus())) {
             throw new BadRequestException("Exchange is not in PENDING status");
@@ -220,8 +277,11 @@ public class TicketExchangeService {
 
     @Transactional
     public void cancelExchange(Long exchangeId, Long userId) {
-        TicketExchange exchange = exchangeRepository.findById(exchangeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Exchange not found"));
+        Optional<TicketExchange> optionalExchange = exchangeRepository.findById(exchangeId);
+        if (!optionalExchange.isPresent()) {
+            throw new ResourceNotFoundException("Exchange not found");
+        }
+        TicketExchange exchange = optionalExchange.get();
 
         if (!exchange.getBuyer().getId().equals(userId) && !exchange.getSeller().getId().equals(userId)) {
             throw new ForbiddenException("You are not part of this exchange");
@@ -234,26 +294,45 @@ public class TicketExchangeService {
 
     private TicketListingResponse toListingResponse(TicketListing listing) {
         Ticket ticket = listing.getTicket();
-        User seller = userRepository.findById(listing.getSellerId()).orElse(null);
+
+        // Tìm seller, có thể null nếu không tìm thấy
+        User seller = null;
+        Optional<User> optionalSeller = userRepository.findById(listing.getSellerId());
+        if (optionalSeller.isPresent()) {
+            seller = optionalSeller.get();
+        }
+
+        // Lấy tên seller nếu có
+        String sellerName = null;
+        if (seller != null) {
+            sellerName = seller.getFullName();
+        }
+
         return new TicketListingResponse(
                 listing.getId(), ticket.getId(), ticket.getTicketCode(),
                 ticket.getBooking().getEvent().getId(),
                 ticket.getBooking().getEvent().getName(),
                 ticket.getTicketType().getName(),
                 listing.getSellerId(),
-                seller != null ? seller.getFullName() : null,
+                sellerName,
                 listing.getListingPrice(), listing.getExchangeType(),
                 listing.getDescription(), listing.getStatus(),
                 listing.getListedAt(), listing.getExpiresAt());
     }
 
     private TicketExchangeResponse toExchangeResponse(TicketExchange exchange) {
+        // Lấy tradeTicketId nếu có
+        Long tradeTicketId = null;
+        if (exchange.getTradeTicket() != null) {
+            tradeTicketId = exchange.getTradeTicket().getId();
+        }
+
         return new TicketExchangeResponse(
                 exchange.getId(), exchange.getTicketListing().getId(),
                 exchange.getSeller().getId(), exchange.getSeller().getFullName(),
                 exchange.getBuyer().getId(), exchange.getBuyer().getFullName(),
                 exchange.getTransactionType(), exchange.getPrice(),
-                exchange.getTradeTicket() != null ? exchange.getTradeTicket().getId() : null,
+                tradeTicketId,
                 exchange.getStatus(), exchange.getPaymentMethod(),
                 exchange.getCreatedAt(), exchange.getCompletedAt());
     }

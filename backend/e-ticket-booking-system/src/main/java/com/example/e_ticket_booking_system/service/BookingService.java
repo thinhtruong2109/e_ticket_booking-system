@@ -4,8 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,11 +18,29 @@ import com.example.e_ticket_booking_system.dto.request.BookingItemRequest;
 import com.example.e_ticket_booking_system.dto.request.CreateBookingRequest;
 import com.example.e_ticket_booking_system.dto.response.BookingDetailResponse;
 import com.example.e_ticket_booking_system.dto.response.BookingResponse;
-import com.example.e_ticket_booking_system.entity.*;
+import com.example.e_ticket_booking_system.entity.Booking;
+import com.example.e_ticket_booking_system.entity.BookingDetail;
+import com.example.e_ticket_booking_system.entity.BookingPromoCode;
+import com.example.e_ticket_booking_system.entity.Event;
+import com.example.e_ticket_booking_system.entity.EventSchedule;
+import com.example.e_ticket_booking_system.entity.PromoCode;
+import com.example.e_ticket_booking_system.entity.Seat;
+import com.example.e_ticket_booking_system.entity.SeatReservation;
+import com.example.e_ticket_booking_system.entity.TicketType;
+import com.example.e_ticket_booking_system.entity.User;
 import com.example.e_ticket_booking_system.exception.BadRequestException;
 import com.example.e_ticket_booking_system.exception.ForbiddenException;
 import com.example.e_ticket_booking_system.exception.ResourceNotFoundException;
-import com.example.e_ticket_booking_system.repository.*;
+import com.example.e_ticket_booking_system.repository.BookingDetailRepository;
+import com.example.e_ticket_booking_system.repository.BookingPromoCodeRepository;
+import com.example.e_ticket_booking_system.repository.BookingRepository;
+import com.example.e_ticket_booking_system.repository.EventRepository;
+import com.example.e_ticket_booking_system.repository.EventScheduleRepository;
+import com.example.e_ticket_booking_system.repository.PromocodeRepository;
+import com.example.e_ticket_booking_system.repository.SeatRepository;
+import com.example.e_ticket_booking_system.repository.SeatReservationRepository;
+import com.example.e_ticket_booking_system.repository.TicketTypeRepository;
+import com.example.e_ticket_booking_system.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -50,11 +68,19 @@ public class BookingService {
     public BookingResponse createBooking(Long customerId, CreateBookingRequest request) {
         log.info("Creating booking for customer: {} event: {}", customerId, request.getEventId());
 
-        User customer = userRepository.findById(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        // Tìm customer theo ID
+        Optional<User> optionalCustomer = userRepository.findById(customerId);
+        if (!optionalCustomer.isPresent()) {
+            throw new ResourceNotFoundException("User not found");
+        }
+        User customer = optionalCustomer.get();
 
-        Event event = eventRepository.findById(request.getEventId())
-                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+        // Tìm event theo ID
+        Optional<Event> optionalEvent = eventRepository.findById(request.getEventId());
+        if (!optionalEvent.isPresent()) {
+            throw new ResourceNotFoundException("Event not found");
+        }
+        Event event = optionalEvent.get();
 
         if (!"PUBLISHED".equals(event.getStatus())) {
             throw new BadRequestException("Event is not available for booking");
@@ -62,8 +88,11 @@ public class BookingService {
 
         EventSchedule schedule = null;
         if (request.getScheduleId() != null) {
-            schedule = scheduleRepository.findById(request.getScheduleId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Schedule not found"));
+            Optional<EventSchedule> optionalSchedule = scheduleRepository.findById(request.getScheduleId());
+            if (!optionalSchedule.isPresent()) {
+                throw new ResourceNotFoundException("Schedule not found");
+            }
+            schedule = optionalSchedule.get();
             if (!"SCHEDULED".equals(schedule.getStatus())) {
                 throw new BadRequestException("Schedule is not available");
             }
@@ -74,8 +103,12 @@ public class BookingService {
         List<BookingDetail> details = new ArrayList<>();
 
         for (BookingItemRequest item : request.getItems()) {
-            TicketType ticketType = ticketTypeRepository.findById(item.getTicketTypeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Ticket type not found: " + item.getTicketTypeId()));
+            // Tìm ticket type theo ID
+            Optional<TicketType> optionalTicketType = ticketTypeRepository.findById(item.getTicketTypeId());
+            if (!optionalTicketType.isPresent()) {
+                throw new ResourceNotFoundException("Ticket type not found: " + item.getTicketTypeId());
+            }
+            TicketType ticketType = optionalTicketType.get();
 
             if (!ticketType.getEvent().getId().equals(event.getId())) {
                 throw new BadRequestException("Ticket type does not belong to this event");
@@ -104,8 +137,12 @@ public class BookingService {
         // Handle seat reservations
         if (request.getSeatIds() != null && !request.getSeatIds().isEmpty() && schedule != null) {
             for (Long seatId : request.getSeatIds()) {
-                Seat seat = seatRepository.findById(seatId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Seat not found: " + seatId));
+                // Tìm seat theo ID
+                Optional<Seat> optionalSeat = seatRepository.findById(seatId);
+                if (!optionalSeat.isPresent()) {
+                    throw new ResourceNotFoundException("Seat not found: " + seatId);
+                }
+                Seat seat = optionalSeat.get();
 
                 // Check seat availability
                 List<SeatReservation> existing = seatReservationRepository
@@ -113,8 +150,14 @@ public class BookingService {
                 existing.addAll(seatReservationRepository
                         .findByEventScheduleIdAndStatus(schedule.getId(), "HOLDING"));
 
-                boolean seatTaken = existing.stream()
-                        .anyMatch(r -> r.getSeat().getId().equals(seatId));
+                // Kiểm tra xem seat đã bị đặt chưa bằng vòng lặp
+                boolean seatTaken = false;
+                for (SeatReservation r : existing) {
+                    if (r.getSeat().getId().equals(seatId)) {
+                        seatTaken = true;
+                        break;
+                    }
+                }
                 if (seatTaken) {
                     throw new BadRequestException("Seat " + seat.getSeatNumber() + " is already reserved");
                 }
@@ -156,8 +199,11 @@ public class BookingService {
             ticketTypeRepository.save(tt);
         }
 
-        // Decrease event available tickets
-        int totalBooked = details.stream().mapToInt(BookingDetail::getQuantity).sum();
+        // Decrease event available tickets - tính tổng số vé đã đặt
+        int totalBooked = 0;
+        for (BookingDetail detail : details) {
+            totalBooked = totalBooked + detail.getQuantity();
+        }
         event.setAvailableTickets(event.getAvailableTickets() - totalBooked);
         eventRepository.save(event);
 
@@ -172,8 +218,12 @@ public class BookingService {
 
     @Transactional
     public BookingResponse applyPromoCode(Long customerId, ApplyPromoCodeRequest request) {
-        Booking booking = bookingRepository.findById(request.getBookingId())
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        // Tìm booking theo ID
+        Optional<Booking> optionalBooking = bookingRepository.findById(request.getBookingId());
+        if (!optionalBooking.isPresent()) {
+            throw new ResourceNotFoundException("Booking not found");
+        }
+        Booking booking = optionalBooking.get();
 
         if (!booking.getCustomer().getId().equals(customerId)) {
             throw new ForbiddenException("This booking does not belong to you");
@@ -242,8 +292,12 @@ public class BookingService {
 
     @Transactional
     public BookingResponse cancelBooking(Long customerId, Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        // Tìm booking theo ID
+        Optional<Booking> optionalBooking = bookingRepository.findById(bookingId);
+        if (!optionalBooking.isPresent()) {
+            throw new ResourceNotFoundException("Booking not found");
+        }
+        Booking booking = optionalBooking.get();
 
         if (!booking.getCustomer().getId().equals(customerId)) {
             throw new ForbiddenException("This booking does not belong to you");
@@ -294,8 +348,12 @@ public class BookingService {
 
     @Transactional
     public void confirmBooking(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        // Tìm booking theo ID
+        Optional<Booking> optionalBooking = bookingRepository.findById(bookingId);
+        if (!optionalBooking.isPresent()) {
+            throw new ResourceNotFoundException("Booking not found");
+        }
+        Booking booking = optionalBooking.get();
 
         booking.setStatus("CONFIRMED");
         bookingRepository.save(booking);
@@ -312,15 +370,23 @@ public class BookingService {
 
     public List<BookingResponse> getMyBookings(Long customerId) {
         List<Booking> bookings = bookingRepository.findByCustomerId(customerId);
-        return bookings.stream().map(b -> {
+        // Chuyển từ danh sách Booking sang danh sách BookingResponse
+        List<BookingResponse> responseList = new ArrayList<>();
+        for (Booking b : bookings) {
             List<BookingDetail> details = bookingDetailRepository.findByBookingId(b.getId());
-            return toResponse(b, details);
-        }).collect(Collectors.toList());
+            BookingResponse response = toResponse(b, details);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public BookingResponse getBookingById(Long bookingId, Long userId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        // Tìm booking theo ID
+        Optional<Booking> optionalBooking = bookingRepository.findById(bookingId);
+        if (!optionalBooking.isPresent()) {
+            throw new ResourceNotFoundException("Booking not found");
+        }
+        Booking booking = optionalBooking.get();
 
         if (!booking.getCustomer().getId().equals(userId)) {
             throw new ForbiddenException("This booking does not belong to you");
@@ -366,11 +432,17 @@ public class BookingService {
         response.setHoldExpiresAt(booking.getHoldExpiresAt());
         response.setCreatedAt(booking.getCreatedAt());
 
+        // Chuyển từ danh sách BookingDetail sang danh sách BookingDetailResponse
         if (details != null) {
-            response.setDetails(details.stream().map(d -> new BookingDetailResponse(
-                    d.getId(), d.getTicketType().getId(), d.getTicketType().getName(),
-                    d.getQuantity(), d.getUnitPrice(), d.getSubtotal()
-            )).collect(Collectors.toList()));
+            List<BookingDetailResponse> detailResponses = new ArrayList<>();
+            for (BookingDetail d : details) {
+                BookingDetailResponse detailResponse = new BookingDetailResponse(
+                        d.getId(), d.getTicketType().getId(), d.getTicketType().getName(),
+                        d.getQuantity(), d.getUnitPrice(), d.getSubtotal()
+                );
+                detailResponses.add(detailResponse);
+            }
+            response.setDetails(detailResponses);
         }
 
         return response;

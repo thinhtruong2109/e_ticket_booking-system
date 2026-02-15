@@ -1,8 +1,9 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,10 +13,17 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.e_ticket_booking_system.dto.request.CheckInRequest;
 import com.example.e_ticket_booking_system.dto.response.CheckInResponse;
 import com.example.e_ticket_booking_system.dto.response.TicketResponse;
-import com.example.e_ticket_booking_system.entity.*;
+import com.example.e_ticket_booking_system.entity.Booking;
+import com.example.e_ticket_booking_system.entity.BookingDetail;
+import com.example.e_ticket_booking_system.entity.Event;
+import com.example.e_ticket_booking_system.entity.Ticket;
+import com.example.e_ticket_booking_system.entity.User;
 import com.example.e_ticket_booking_system.exception.BadRequestException;
 import com.example.e_ticket_booking_system.exception.ResourceNotFoundException;
-import com.example.e_ticket_booking_system.repository.*;
+import com.example.e_ticket_booking_system.repository.BookingDetailRepository;
+import com.example.e_ticket_booking_system.repository.BookingRepository;
+import com.example.e_ticket_booking_system.repository.TicketRepository;
+import com.example.e_ticket_booking_system.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -34,8 +42,12 @@ public class TicketService {
 
     @Transactional
     public void generateTickets(Long bookingId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        // Tìm booking theo ID
+        Optional<Booking> optionalBooking = bookingRepository.findById(bookingId);
+        if (!optionalBooking.isPresent()) {
+            throw new ResourceNotFoundException("Booking not found");
+        }
+        Booking booking = optionalBooking.get();
 
         if (!"CONFIRMED".equals(booking.getStatus())) {
             throw new BadRequestException("Booking must be confirmed before generating tickets");
@@ -55,9 +67,13 @@ public class TicketService {
                 ticket.setQrCode(qrCode);
                 ticket.setCurrentOwner(booking.getCustomer());
 
-                // Determine transferability
+                // Xác định ticket có chuyển nhượng được không
                 Event event = booking.getEvent();
-                ticket.setIsTransferable(event.getAllowTicketExchange() != null && event.getAllowTicketExchange());
+                boolean isTransferable = false;
+                if (event.getAllowTicketExchange() != null && event.getAllowTicketExchange()) {
+                    isTransferable = true;
+                }
+                ticket.setIsTransferable(isTransferable);
                 ticket.setIsCheckedIn(false);
 
                 ticketRepository.save(ticket);
@@ -67,15 +83,23 @@ public class TicketService {
     }
 
     public List<TicketResponse> getTicketsByBooking(Long bookingId) {
-        return ticketRepository.findByBookingId(bookingId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<Ticket> tickets = ticketRepository.findByBookingId(bookingId);
+        List<TicketResponse> responseList = new ArrayList<>();
+        for (Ticket ticket : tickets) {
+            TicketResponse response = toResponse(ticket);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public List<TicketResponse> getMyTickets(Long userId) {
-        return ticketRepository.findByCurrentOwnerId(userId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<Ticket> tickets = ticketRepository.findByCurrentOwnerId(userId);
+        List<TicketResponse> responseList = new ArrayList<>();
+        for (Ticket ticket : tickets) {
+            TicketResponse response = toResponse(ticket);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public TicketResponse getTicketByCode(String ticketCode) {
@@ -111,8 +135,11 @@ public class TicketService {
         }
 
         // Check in
-        User staff = userRepository.findById(staffId)
-                .orElseThrow(() -> new ResourceNotFoundException("Staff not found"));
+        Optional<User> optionalStaff = userRepository.findById(staffId);
+        if (!optionalStaff.isPresent()) {
+            throw new ResourceNotFoundException("Staff not found");
+        }
+        User staff = optionalStaff.get();
 
         ticket.setIsCheckedIn(true);
         ticket.setCheckedInAt(LocalDateTime.now());
@@ -144,8 +171,14 @@ public class TicketService {
         response.setBookingCode(ticket.getBooking().getBookingCode());
         response.setEventId(ticket.getBooking().getEvent().getId());
         response.setEventName(ticket.getBooking().getEvent().getName());
-        response.setScheduleId(ticket.getBooking().getSchedule() != null ? 
-                ticket.getBooking().getSchedule().getId() : null);
+
+        // Lấy scheduleId nếu có
+        if (ticket.getBooking().getSchedule() != null) {
+            response.setScheduleId(ticket.getBooking().getSchedule().getId());
+        } else {
+            response.setScheduleId(null);
+        }
+
         response.setTicketTypeName(ticket.getTicketType().getName());
         response.setQrCode(ticket.getQrCode());
         response.setCurrentOwnerId(ticket.getCurrentOwner().getId());
@@ -153,8 +186,14 @@ public class TicketService {
         response.setIsTransferable(ticket.getIsTransferable());
         response.setIsCheckedIn(ticket.getIsCheckedIn());
         response.setCheckedInAt(ticket.getCheckedInAt());
-        response.setCheckedInByName(ticket.getCheckedInBy() != null ? 
-                ticket.getCheckedInBy().getFullName() : null);
+
+        // Lấy tên người check-in nếu có
+        if (ticket.getCheckedInBy() != null) {
+            response.setCheckedInByName(ticket.getCheckedInBy().getFullName());
+        } else {
+            response.setCheckedInByName(null);
+        }
+
         response.setCreatedAt(ticket.getCreatedAt());
         return response;
     }

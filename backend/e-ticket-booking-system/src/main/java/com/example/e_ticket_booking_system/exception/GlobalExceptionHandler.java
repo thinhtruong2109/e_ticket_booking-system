@@ -11,7 +11,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -62,9 +63,22 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
-        String errors = ex.getBindingResult().getFieldErrors().stream()
-                .map(FieldError::getDefaultMessage)
-                .collect(Collectors.joining(", "));
+        // Lấy tất cả lỗi validation và nối thành chuỗi
+        List<FieldError> fieldErrors = ex.getBindingResult().getFieldErrors();
+        List<String> errorMessages = new ArrayList<>();
+        for (FieldError fieldError : fieldErrors) {
+            errorMessages.add(fieldError.getDefaultMessage());
+        }
+
+        // Nối các lỗi bằng dấu phẩy
+        String errors = "";
+        for (int i = 0; i < errorMessages.size(); i++) {
+            errors = errors + errorMessages.get(i);
+            if (i < errorMessages.size() - 1) {
+                errors = errors + ", ";
+            }
+        }
+
         log.error("Validation error: {}", errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(400, errors));

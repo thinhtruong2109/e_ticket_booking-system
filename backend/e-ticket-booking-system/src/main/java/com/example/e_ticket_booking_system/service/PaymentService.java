@@ -1,7 +1,7 @@
 package com.example.e_ticket_booking_system.service;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -34,8 +34,12 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse createPayment(Long userId, CreatePaymentRequest request) {
-        Booking booking = bookingRepository.findById(request.getBookingId())
-                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        // Tìm booking theo ID
+        Optional<Booking> optionalBooking = bookingRepository.findById(request.getBookingId());
+        if (!optionalBooking.isPresent()) {
+            throw new ResourceNotFoundException("Booking not found");
+        }
+        Booking booking = optionalBooking.get();
 
         if (!booking.getCustomer().getId().equals(userId)) {
             throw new ForbiddenException("This booking does not belong to you");

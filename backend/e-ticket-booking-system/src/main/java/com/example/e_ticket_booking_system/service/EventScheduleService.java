@@ -1,7 +1,8 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,8 +30,12 @@ public class EventScheduleService {
     private final EventRepository eventRepository;
 
     public EventScheduleResponse createSchedule(Long organizerId, CreateEventScheduleRequest request) {
-        Event event = eventRepository.findById(request.getEventId())
-                .orElseThrow(() -> new ResourceNotFoundException("Event not found with id: " + request.getEventId()));
+        // Tìm event theo ID
+        Optional<Event> optionalEvent = eventRepository.findById(request.getEventId());
+        if (!optionalEvent.isPresent()) {
+            throw new ResourceNotFoundException("Event not found with id: " + request.getEventId());
+        }
+        Event event = optionalEvent.get();
 
         if (!event.getOrganizer().getId().equals(organizerId)) {
             throw new ForbiddenException("You don't have permission to add schedules to this event");
@@ -54,28 +59,46 @@ public class EventScheduleService {
     }
 
     public List<EventScheduleResponse> getSchedulesByEvent(Long eventId) {
-        return scheduleRepository.findByEventId(eventId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<EventSchedule> schedules = scheduleRepository.findByEventId(eventId);
+        // Chuyển từ danh sách EventSchedule sang danh sách EventScheduleResponse
+        List<EventScheduleResponse> responseList = new ArrayList<>();
+        for (EventSchedule schedule : schedules) {
+            EventScheduleResponse response = toResponse(schedule);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public List<EventScheduleResponse> getAvailableSchedules(Long eventId) {
-        return scheduleRepository.findByEventId(eventId).stream()
-                .filter(s -> "SCHEDULED".equals(s.getStatus()) && 
-                             (s.getAvailableSeats() == null || s.getAvailableSeats() > 0))
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<EventSchedule> allSchedules = scheduleRepository.findByEventId(eventId);
+        // Lọc ra các schedule có status SCHEDULED và còn chỗ
+        List<EventScheduleResponse> responseList = new ArrayList<>();
+        for (EventSchedule s : allSchedules) {
+            boolean isScheduled = "SCHEDULED".equals(s.getStatus());
+            boolean hasAvailableSeats = (s.getAvailableSeats() == null || s.getAvailableSeats() > 0);
+            if (isScheduled && hasAvailableSeats) {
+                EventScheduleResponse response = toResponse(s);
+                responseList.add(response);
+            }
+        }
+        return responseList;
     }
 
     public EventScheduleResponse getScheduleById(Long id) {
-        EventSchedule schedule = scheduleRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id: " + id));
+        Optional<EventSchedule> optionalSchedule = scheduleRepository.findById(id);
+        if (!optionalSchedule.isPresent()) {
+            throw new ResourceNotFoundException("Schedule not found with id: " + id);
+        }
+        EventSchedule schedule = optionalSchedule.get();
         return toResponse(schedule);
     }
 
     public EventScheduleResponse cancelSchedule(Long scheduleId, Long organizerId) {
-        EventSchedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Schedule not found with id: " + scheduleId));
+        Optional<EventSchedule> optionalSchedule = scheduleRepository.findById(scheduleId);
+        if (!optionalSchedule.isPresent()) {
+            throw new ResourceNotFoundException("Schedule not found with id: " + scheduleId);
+        }
+        EventSchedule schedule = optionalSchedule.get();
 
         if (!schedule.getEvent().getOrganizer().getId().equals(organizerId)) {
             throw new ForbiddenException("You don't have permission to cancel this schedule");

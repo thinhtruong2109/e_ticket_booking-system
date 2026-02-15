@@ -1,7 +1,8 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,14 +26,22 @@ public class EventCategoryService {
     private final EventCategoryRepository categoryRepository;
 
     public List<EventCategoryResponse> getAllCategories() {
-        return categoryRepository.findAll().stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<EventCategory> categories = categoryRepository.findAll();
+        // Chuyển từ danh sách Entity sang danh sách Response
+        List<EventCategoryResponse> responseList = new ArrayList<>();
+        for (EventCategory category : categories) {
+            EventCategoryResponse response = toResponse(category);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public EventCategoryResponse getCategoryById(Long id) {
-        EventCategory category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        Optional<EventCategory> optionalCategory = categoryRepository.findById(id);
+        if (!optionalCategory.isPresent()) {
+            throw new ResourceNotFoundException("Category not found with id: " + id);
+        }
+        EventCategory category = optionalCategory.get();
         return toResponse(category);
     }
 
@@ -52,8 +61,11 @@ public class EventCategoryService {
     }
 
     public EventCategoryResponse updateCategory(Long id, CreateEventCategoryRequest request) {
-        EventCategory category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        Optional<EventCategory> optionalCategory = categoryRepository.findById(id);
+        if (!optionalCategory.isPresent()) {
+            throw new ResourceNotFoundException("Category not found with id: " + id);
+        }
+        EventCategory category = optionalCategory.get();
 
         if (request.getName() != null) {
             EventCategory existing = categoryRepository.findByName(request.getName());
@@ -75,8 +87,11 @@ public class EventCategoryService {
     }
 
     public void deleteCategory(Long id) {
-        EventCategory category = categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+        Optional<EventCategory> optionalCategory = categoryRepository.findById(id);
+        if (!optionalCategory.isPresent()) {
+            throw new ResourceNotFoundException("Category not found with id: " + id);
+        }
+        EventCategory category = optionalCategory.get();
         categoryRepository.delete(category);
         log.info("Category deleted: {}", category.getName());
     }

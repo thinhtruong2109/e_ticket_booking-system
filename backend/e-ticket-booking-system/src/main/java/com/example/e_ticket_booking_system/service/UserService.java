@@ -1,7 +1,8 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,14 +29,20 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
 
     public UserResponse getUserProfile(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (!optionalUser.isPresent()) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        User user = optionalUser.get();
         return toUserResponse(user);
     }
 
     public UserResponse updateProfile(Long userId, UpdateUserRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (!optionalUser.isPresent()) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        User user = optionalUser.get();
 
         if (request.getFullName() != null) {
             user.setFullName(request.getFullName());
@@ -50,8 +57,11 @@ public class UserService {
     }
 
     public void changePassword(Long userId, ChangePasswordRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (!optionalUser.isPresent()) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        User user = optionalUser.get();
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new BadRequestException("Current password is incorrect");
@@ -64,20 +74,31 @@ public class UserService {
 
     // Admin methods
     public List<UserResponse> getAllUsers() {
-        return userRepository.findAll().stream()
-                .map(this::toUserResponse)
-                .collect(Collectors.toList());
+        List<User> users = userRepository.findAll();
+        List<UserResponse> responseList = new ArrayList<>();
+        for (User user : users) {
+            UserResponse response = toUserResponse(user);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public List<UserResponse> getUsersByRole(String role) {
-        return userRepository.findByRole(role).stream()
-                .map(this::toUserResponse)
-                .collect(Collectors.toList());
+        List<User> users = userRepository.findByRole(role);
+        List<UserResponse> responseList = new ArrayList<>();
+        for (User user : users) {
+            UserResponse response = toUserResponse(user);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public UserResponse banUser(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (!optionalUser.isPresent()) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        User user = optionalUser.get();
         user.setStatus("BANNED");
         user = userRepository.save(user);
         log.info("User banned: {}", user.getEmail());
@@ -85,8 +106,11 @@ public class UserService {
     }
 
     public UserResponse unbanUser(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (!optionalUser.isPresent()) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        User user = optionalUser.get();
         user.setStatus("ACTIVE");
         user = userRepository.save(user);
         log.info("User unbanned: {}", user.getEmail());
@@ -94,8 +118,11 @@ public class UserService {
     }
 
     public UserResponse changeUserRole(Long userId, String role) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (!optionalUser.isPresent()) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        User user = optionalUser.get();
         user.setRole(role);
         user = userRepository.save(user);
         log.info("User role changed to {} for: {}", role, user.getEmail());

@@ -1,7 +1,8 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,8 +30,12 @@ public class TicketTypeService {
     private final EventRepository eventRepository;
 
     public TicketTypeResponse createTicketType(Long organizerId, CreateTicketTypeRequest request) {
-        Event event = eventRepository.findById(request.getEventId())
-                .orElseThrow(() -> new ResourceNotFoundException("Event not found with id: " + request.getEventId()));
+        // Tìm event theo ID
+        Optional<Event> optionalEvent = eventRepository.findById(request.getEventId());
+        if (!optionalEvent.isPresent()) {
+            throw new ResourceNotFoundException("Event not found with id: " + request.getEventId());
+        }
+        Event event = optionalEvent.get();
 
         if (!event.getOrganizer().getId().equals(organizerId)) {
             throw new ForbiddenException("You don't have permission to add ticket types to this event");
@@ -47,7 +52,13 @@ public class TicketTypeService {
         ticketType.setPrice(request.getPrice());
         ticketType.setTotalQuantity(request.getTotalQuantity());
         ticketType.setAvailableQuantity(request.getTotalQuantity());
-        ticketType.setMaxPerBooking(request.getMaxPerBooking() != null ? request.getMaxPerBooking() : 10);
+
+        // Xác định maxPerBooking: mặc định là 10 nếu không truyền vào
+        if (request.getMaxPerBooking() != null) {
+            ticketType.setMaxPerBooking(request.getMaxPerBooking());
+        } else {
+            ticketType.setMaxPerBooking(10);
+        }
 
         ticketType = ticketTypeRepository.save(ticketType);
         log.info("Ticket type created: {} for event: {}", ticketType.getName(), event.getName());
@@ -55,21 +66,34 @@ public class TicketTypeService {
     }
 
     public List<TicketTypeResponse> getTicketTypesByEvent(Long eventId) {
-        return ticketTypeRepository.findByEventId(eventId).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<TicketType> ticketTypes = ticketTypeRepository.findByEventId(eventId);
+        List<TicketTypeResponse> responseList = new ArrayList<>();
+        for (TicketType tt : ticketTypes) {
+            TicketTypeResponse response = toResponse(tt);
+            responseList.add(response);
+        }
+        return responseList;
     }
 
     public List<TicketTypeResponse> getAvailableTicketTypes(Long eventId) {
-        return ticketTypeRepository.findByEventId(eventId).stream()
-                .filter(tt -> tt.getAvailableQuantity() > 0)
-                .map(this::toResponse)
-                .collect(Collectors.toList());
+        List<TicketType> ticketTypes = ticketTypeRepository.findByEventId(eventId);
+        // Lọc ra các loại vé còn số lượng
+        List<TicketTypeResponse> responseList = new ArrayList<>();
+        for (TicketType tt : ticketTypes) {
+            if (tt.getAvailableQuantity() > 0) {
+                TicketTypeResponse response = toResponse(tt);
+                responseList.add(response);
+            }
+        }
+        return responseList;
     }
 
     public TicketTypeResponse getTicketTypeById(Long id) {
-        TicketType ticketType = ticketTypeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket type not found with id: " + id));
+        Optional<TicketType> optionalTicketType = ticketTypeRepository.findById(id);
+        if (!optionalTicketType.isPresent()) {
+            throw new ResourceNotFoundException("Ticket type not found with id: " + id);
+        }
+        TicketType ticketType = optionalTicketType.get();
         return toResponse(ticketType);
     }
 

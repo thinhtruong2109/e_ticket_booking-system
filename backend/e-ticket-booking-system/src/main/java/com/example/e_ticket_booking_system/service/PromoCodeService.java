@@ -1,5 +1,6 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,12 +10,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.example.e_ticket_booking_system.dto.request.AvailablePromoRequest;
+import com.example.e_ticket_booking_system.dto.request.BookingItemRequest;
 import com.example.e_ticket_booking_system.dto.request.CreatePromoCodeRequest;
+import com.example.e_ticket_booking_system.dto.response.AvailablePromoResponse;
 import com.example.e_ticket_booking_system.dto.response.PromoCodeResponse;
+import com.example.e_ticket_booking_system.dto.response.PromoPreview;
 import com.example.e_ticket_booking_system.entity.PromoCode;
+import com.example.e_ticket_booking_system.entity.TicketType;
 import com.example.e_ticket_booking_system.exception.BadRequestException;
 import com.example.e_ticket_booking_system.exception.ResourceNotFoundException;
 import com.example.e_ticket_booking_system.repository.PromocodeRepository;
+import com.example.e_ticket_booking_system.repository.TicketTypeRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +32,7 @@ public class PromoCodeService {
     private static final Logger log = LoggerFactory.getLogger(PromoCodeService.class);
 
     private final PromocodeRepository promoCodeRepository;
+    private final TicketTypeRepository ticketTypeRepository;
 
     public PromoCodeResponse createPromoCode(CreatePromoCodeRequest request) {
         if (promoCodeRepository.findByCode(request.getCode()) != null) {
@@ -104,6 +112,68 @@ public class PromoCodeService {
                 log.info("Promo code expired: {}", promo.getCode());
             }
         }
+    }
+
+    public AvailablePromoResponse getAvailablePromoCodes(AvailablePromoRequest request) {
+        // 1. Tính totalAmount từ items
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        for (BookingItemRequest item : request.getItems()) {
+            Optional<TicketType> optionalTt = ticketTypeRepository.findById(item.getTicketTypeId());
+            if (!optionalTt.isPresent()) {
+                throw new ResourceNotFoundException("Ticket type not found: " + item.getTicketTypeId());
+            }
+            TicketType tt = optionalTt.get();
+            if (!tt.getEvent().getId().equals(request.getEventId())) {
+                throw new BadRequestException("Ticket type " + tt.getName() + " does not belong to this event");
+            }
+            BigDecimal subtotal = tt.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
+            totalAmount = totalAmount.add(subtotal);
+        }
+
+        // 2. Query promo codes: ACTIVE, trong thời hạn, còn lượt, đủ minOrderAmount
+        LocalDateTime now = LocalDateTime.now();
+        List<PromoCode> activePromos = promoCodeRepository.findByStatus("ACTIVE");
+        List<PromoPreview> previews = new ArrayList<>();
+
+        for (PromoCode promo : activePromos) {
+            // Kiểm tra thời hạn
+            if (now.isBefore(promo.getValidFrom()) || now.isAfter(promo.getValidTo())) {
+                continue;
+            }
+            // Kiểm tra còn lượt
+            if (promo.getUsageLimit() != null && promo.getUsedCount() >= promo.getUsageLimit()) {
+                continue;
+            }
+            // Kiểm tra minOrderAmount
+            if (promo.getMinOrderAmount() != null &&
+                totalAmount.compareTo(promo.getMinOrderAmount()) < 0) {
+                continue;
+            }
+
+            // 3. Tính discountAmount và finalAmount
+            BigDecimal discount;
+            if ("PERCENTAGE".equals(promo.getDiscountType())) {
+                discount = totalAmount
+                        .multiply(promo.getDiscountValue())
+                        .divide(BigDecimal.valueOf(100));
+                if (promo.getMaxDiscountAmount() != null && discount.compareTo(promo.getMaxDiscountAmount()) > 0) {
+                    discount = promo.getMaxDiscountAmount();
+                }
+            } else {
+                discount = promo.getDiscountValue();
+            }
+
+            BigDecimal finalAmount = totalAmount.subtract(discount);
+            if (finalAmount.compareTo(BigDecimal.ZERO) < 0) {
+                finalAmount = BigDecimal.ZERO;
+            }
+
+            previews.add(new PromoPreview(
+                    promo.getId(), promo.getCode(), promo.getDescription(),
+                    discount, finalAmount));
+        }
+
+        return new AvailablePromoResponse(totalAmount, previews);
     }
 
     private PromoCodeResponse toResponse(PromoCode promo) {

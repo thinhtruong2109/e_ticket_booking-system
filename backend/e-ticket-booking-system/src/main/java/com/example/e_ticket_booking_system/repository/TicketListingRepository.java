@@ -1,5 +1,6 @@
 package com.example.e_ticket_booking_system.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,4 +13,5 @@ public interface TicketListingRepository extends JpaRepository<TicketListing, Lo
     List<TicketListing> findBySellerId(Long sellerId);
     List<TicketListing> findByStatus(String status);
     TicketListing findByTicketId(Long ticketId);
+    List<TicketListing> findByStatusAndExpiresAtBefore(String status, LocalDateTime time);
 }

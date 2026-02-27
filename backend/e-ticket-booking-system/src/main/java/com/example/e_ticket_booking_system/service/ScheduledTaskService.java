@@ -15,6 +15,8 @@ public class ScheduledTaskService {
 
     private final BookingService bookingService;
     private final PromoCodeService promoCodeService;
+    private final EventService eventService;
+    private final TicketExchangeService ticketExchangeService;
 
     // Run every 1 minute - expire pending bookings
     @Scheduled(fixedRate = 60000)
@@ -24,6 +26,28 @@ public class ScheduledTaskService {
             bookingService.expireBookings();
         } catch (Exception e) {
             log.error("Error expiring bookings: {}", e.getMessage());
+        }
+    }
+
+    // Run every hour - update event and schedule statuses
+    @Scheduled(cron = "0 0 * * * *")
+    public void updateEventStatuses() {
+        log.debug("Running scheduled task: update event statuses");
+        try {
+            eventService.updateEventStatuses();
+        } catch (Exception e) {
+            log.error("Error updating event statuses: {}", e.getMessage());
+        }
+    }
+
+    // Run every hour - expire ticket listings
+    @Scheduled(cron = "0 0 * * * *")
+    public void expireTicketListings() {
+        log.debug("Running scheduled task: expire ticket listings");
+        try {
+            ticketExchangeService.expireListings();
+        } catch (Exception e) {
+            log.error("Error expiring ticket listings: {}", e.getMessage());
         }
     }
 

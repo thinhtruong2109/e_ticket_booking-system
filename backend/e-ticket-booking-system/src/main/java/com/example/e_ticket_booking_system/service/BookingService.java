@@ -13,7 +13,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.e_ticket_booking_system.dto.request.ApplyPromoCodeRequest;
 import com.example.e_ticket_booking_system.dto.request.BookingItemRequest;
 import com.example.e_ticket_booking_system.dto.request.CreateBookingRequest;
 import com.example.e_ticket_booking_system.dto.response.BookingDetailResponse;
@@ -212,81 +211,58 @@ public class BookingService {
             scheduleRepository.save(schedule);
         }
 
-        log.info("Booking created: {} for customer: {}", bookingCode, customer.getEmail());
-        return toResponse(booking, details);
-    }
-
-    @Transactional
-    public BookingResponse applyPromoCode(Long customerId, ApplyPromoCodeRequest request) {
-        // Tìm booking theo ID
-        Optional<Booking> optionalBooking = bookingRepository.findById(request.getBookingId());
-        if (!optionalBooking.isPresent()) {
-            throw new ResourceNotFoundException("Booking not found");
-        }
-        Booking booking = optionalBooking.get();
-
-        if (!booking.getCustomer().getId().equals(customerId)) {
-            throw new ForbiddenException("This booking does not belong to you");
-        }
-
-        if (!"PENDING".equals(booking.getStatus())) {
-            throw new BadRequestException("Promo code can only be applied to pending bookings");
-        }
-
-        PromoCode promo = promoCodeRepository.findByCode(request.getPromoCode());
-        if (promo == null) {
-            throw new ResourceNotFoundException("Promo code not found");
-        }
-
-        if (!"ACTIVE".equals(promo.getStatus())) {
-            throw new BadRequestException("Promo code is not active");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        if (now.isBefore(promo.getValidFrom()) || now.isAfter(promo.getValidTo())) {
-            throw new BadRequestException("Promo code has expired or is not yet valid");
-        }
-
-        if (promo.getUsageLimit() != null && promo.getUsedCount() >= promo.getUsageLimit()) {
-            throw new BadRequestException("Promo code usage limit reached");
-        }
-
-        if (promo.getMinOrderAmount() != null && 
-            booking.getTotalAmount().compareTo(promo.getMinOrderAmount()) < 0) {
-            throw new BadRequestException("Order amount does not meet minimum for this promo code");
-        }
-
-        // Calculate discount
-        BigDecimal discount;
-        if ("PERCENTAGE".equals(promo.getDiscountType())) {
-            discount = booking.getTotalAmount()
-                    .multiply(promo.getDiscountValue())
-                    .divide(BigDecimal.valueOf(100));
-            if (promo.getMaxDiscountAmount() != null && discount.compareTo(promo.getMaxDiscountAmount()) > 0) {
-                discount = promo.getMaxDiscountAmount();
+        // Apply promo code if provided
+        if (request.getPromoCodeId() != null) {
+            Optional<PromoCode> optionalPromo = promoCodeRepository.findById(request.getPromoCodeId());
+            if (!optionalPromo.isPresent()) {
+                throw new BadRequestException("Promo code not found");
             }
-        } else {
-            discount = promo.getDiscountValue();
+            PromoCode promo = optionalPromo.get();
+
+            // Re-validate promo (phòng edge case hết lượt giữa chừng)
+            if (!"ACTIVE".equals(promo.getStatus())) {
+                throw new BadRequestException("Promo code is no longer active");
+            }
+            LocalDateTime now = LocalDateTime.now();
+            if (now.isBefore(promo.getValidFrom()) || now.isAfter(promo.getValidTo())) {
+                throw new BadRequestException("Promo code has expired or is not yet valid");
+            }
+            if (promo.getUsageLimit() != null && promo.getUsedCount() >= promo.getUsageLimit()) {
+                throw new BadRequestException("Promo code usage limit reached");
+            }
+            if (promo.getMinOrderAmount() != null &&
+                totalAmount.compareTo(promo.getMinOrderAmount()) < 0) {
+                throw new BadRequestException("Order amount does not meet minimum for this promo code");
+            }
+
+            // Calculate discount
+            BigDecimal discount;
+            if ("PERCENTAGE".equals(promo.getDiscountType())) {
+                discount = totalAmount
+                        .multiply(promo.getDiscountValue())
+                        .divide(BigDecimal.valueOf(100));
+                if (promo.getMaxDiscountAmount() != null && discount.compareTo(promo.getMaxDiscountAmount()) > 0) {
+                    discount = promo.getMaxDiscountAmount();
+                }
+            } else {
+                discount = promo.getDiscountValue();
+            }
+
+            booking.setDiscountAmount(discount);
+            booking.setFinalAmount(totalAmount.subtract(discount));
+            bookingRepository.save(booking);
+
+            // Record promo usage (không tăng usedCount ở đây, tăng khi payment SUCCESS)
+            BookingPromoCode bpc = new BookingPromoCode();
+            bpc.setBooking(booking);
+            bpc.setPromoCode(promo);
+            bpc.setDiscountApplied(discount);
+            bookingPromoCodeRepository.save(bpc);
+
+            log.info("Promo code {} applied to booking {}", promo.getCode(), bookingCode);
         }
 
-        booking.setDiscountAmount(discount);
-        booking.setFinalAmount(booking.getTotalAmount().subtract(discount));
-        bookingRepository.save(booking);
-
-        // Record promo usage
-        BookingPromoCode bpc = new BookingPromoCode();
-        bpc.setBooking(booking);
-        bpc.setPromoCode(promo);
-        bpc.setDiscountApplied(discount);
-        bookingPromoCodeRepository.save(bpc);
-
-        // Increment usage
-        promo.setUsedCount(promo.getUsedCount() + 1);
-        promoCodeRepository.save(promo);
-
-        log.info("Promo code {} applied to booking {}", promo.getCode(), booking.getBookingCode());
-
-        List<BookingDetail> details = bookingDetailRepository.findByBookingId(booking.getId());
+        log.info("Booking created: {} for customer: {}", bookingCode, customer.getEmail());
         return toResponse(booking, details);
     }
 

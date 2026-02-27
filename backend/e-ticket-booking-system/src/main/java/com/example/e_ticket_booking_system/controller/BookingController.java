@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.e_ticket_booking_system.config.SecurityUtils;
-import com.example.e_ticket_booking_system.dto.request.ApplyPromoCodeRequest;
 import com.example.e_ticket_booking_system.dto.request.CreateBookingRequest;
 import com.example.e_ticket_booking_system.dto.response.ApiResponse;
 import com.example.e_ticket_booking_system.dto.response.BookingResponse;
@@ -35,14 +34,6 @@ public class BookingController {
         Long userId = securityUtils.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Booking created",
                 bookingService.createBooking(userId, request)));
-    }
-
-    @PostMapping("/apply-promo")
-    public ResponseEntity<ApiResponse<BookingResponse>> applyPromoCode(
-            @Valid @RequestBody ApplyPromoCodeRequest request) {
-        Long userId = securityUtils.getCurrentUserId();
-        return ResponseEntity.ok(ApiResponse.success("Promo code applied",
-                bookingService.applyPromoCode(userId, request)));
     }
 
     @DeleteMapping("/{id}")

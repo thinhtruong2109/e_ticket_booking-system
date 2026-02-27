@@ -1,10 +1,15 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.nio.charset.StandardCharsets;
+
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -17,20 +22,22 @@ public class EmailService {
     private String from;
 
     public void sendOtpEmail(String toEmail, String otp) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(from);
-        message.setTo(toEmail);
-        message.setSubject("Xác nhận email - Mã OTP của bạn");
-        message.setText("""
-            Xin chào!
+        try {
+            String html = new String(
+                    new ClassPathResource("templates/otp-email.html").getInputStream().readAllBytes(),
+                    StandardCharsets.UTF_8);
+            html = html.replace("{{OTP}}", otp);
 
-            Mã OTP xác nhận email của bạn là: %s
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(from);
+            helper.setTo(toEmail);
+            helper.setSubject("Verify your email - E-Ticket OTP");
+            helper.setText(html, true);
 
-            Mã có hiệu lực trong 5 phút. Vui lòng không chia sẻ mã này cho ai.
-
-            Trân trọng,
-            E-Ticket Team
-            """.formatted(otp));
-        mailSender.send(message);
+            mailSender.send(mimeMessage);
+        } catch (MessagingException | java.io.IOException e) {
+            throw new RuntimeException("Failed to send OTP email", e);
+        }
     }
 }

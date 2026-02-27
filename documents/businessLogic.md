@@ -261,6 +261,10 @@
 - Calculate total_amount = sum(ticket_price * quantity)
 - Nếu có `promoCodeId`:
   - Validate promo code (status = ACTIVE, valid_from/valid_to, usageLimit vs usedCount, minOrderAmount)
+  - **Validate applicationType:**
+    - `GLOBAL`: Áp dụng mọi event → pass
+    - `ORGANIZER_ALL`: Check `promo.createdBy.id == event.organizer.id` → nếu sai throw lỗi
+    - `SPECIFIC_EVENTS`: Check event.id có trong bảng PromoCodeEventJoin → nếu không throw lỗi
   - Calculate discount:
     - PERCENTAGE: discount = total * (discount_value / 100)
     - FIXED_AMOUNT: discount = discount_value
@@ -290,10 +294,16 @@
 ### **9.2. Get Available Promo Codes (Preview)**
 - User gửi danh sách items (ticketTypeId + quantity) và eventId
 - Hệ thống tính totalAmount từ items
-- Lọc promo codes: status = ACTIVE, còn hạn, chưa hết lượt dùng, đủ minOrderAmount
+- Xác định organizer của event (từ event.organizer.id)
+- **Lọc promo codes theo 3 loại (JPQL query):**
+  1. `GLOBAL` (Admin tạo): status = ACTIVE, còn hạn → áp dụng tất cả events
+  2. `ORGANIZER_ALL` (Organizer tạo): status = ACTIVE, còn hạn, `createdBy.id == event.organizer.id`
+  3. `SPECIFIC_EVENTS` (Organizer tạo): status = ACTIVE, còn hạn, event phải có trong bảng PromoCodeEventJoin
+- Sau đó filter thêm: chưa hết lượt dùng, đủ minOrderAmount
 - Cho mỗi promo, tính preview: discountAmount, finalAmount
-- Trả về danh sách promo khả dụng kèm số tiền giảm dự kiến
-- **Endpoint:** `POST /api/promo-codes/available` (chỉ cần đăng nhập, không cần ADMIN)
+- Trả về danh sách promo khả dụng kèm số tiền giảm dự kiến và `applicationType`
+- **Promo code của Organizer khác tạo cho event khác sẽ KHÔNG hiển thị**
+- **Endpoint:** `POST /api/promo-codes/available` (chỉ cần đăng nhập)
 
 ### **9.3. Cancel Booking (User)**
 - Check booking belongs to user

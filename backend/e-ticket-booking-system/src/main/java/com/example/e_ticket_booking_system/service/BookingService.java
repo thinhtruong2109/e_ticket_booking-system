@@ -23,6 +23,7 @@ import com.example.e_ticket_booking_system.entity.BookingPromoCode;
 import com.example.e_ticket_booking_system.entity.Event;
 import com.example.e_ticket_booking_system.entity.EventSchedule;
 import com.example.e_ticket_booking_system.entity.PromoCode;
+import com.example.e_ticket_booking_system.entity.PromoCodeEventJoin;
 import com.example.e_ticket_booking_system.entity.Seat;
 import com.example.e_ticket_booking_system.entity.SeatReservation;
 import com.example.e_ticket_booking_system.entity.TicketType;
@@ -35,6 +36,7 @@ import com.example.e_ticket_booking_system.repository.BookingPromoCodeRepository
 import com.example.e_ticket_booking_system.repository.BookingRepository;
 import com.example.e_ticket_booking_system.repository.EventRepository;
 import com.example.e_ticket_booking_system.repository.EventScheduleRepository;
+import com.example.e_ticket_booking_system.repository.PromoCodeEventJoinRepository;
 import com.example.e_ticket_booking_system.repository.PromocodeRepository;
 import com.example.e_ticket_booking_system.repository.SeatRepository;
 import com.example.e_ticket_booking_system.repository.SeatReservationRepository;
@@ -59,6 +61,7 @@ public class BookingService {
     private final SeatReservationRepository seatReservationRepository;
     private final UserRepository userRepository;
     private final PromocodeRepository promoCodeRepository;
+    private final PromoCodeEventJoinRepository promoCodeEventRepository;
 
     @Value("${booking.hold-duration-minutes:15}")
     private int holdDurationMinutes;
@@ -234,6 +237,26 @@ public class BookingService {
                 totalAmount.compareTo(promo.getMinOrderAmount()) < 0) {
                 throw new BadRequestException("Order amount does not meet minimum for this promo code");
             }
+
+            // Validate applicationType: promo code phải áp dụng được cho event này
+            String appType = promo.getApplicationType();
+            if ("ORGANIZER_ALL".equals(appType)) {
+                // Chỉ áp dụng cho events của organizer đã tạo promo code
+                if (!promo.getCreatedBy().getId().equals(event.getOrganizer().getId())) {
+                    throw new BadRequestException("This promo code is not applicable to this event");
+                }
+            } else if ("SPECIFIC_EVENTS".equals(appType)) {
+                // Chỉ áp dụng cho các events cụ thể trong bảng promo_code_events
+                List<PromoCodeEventJoin> eventJoins = promoCodeEventRepository.findByPromoCodeId(promo.getId());
+                List<Long> applicableEventIds = new ArrayList<>();
+                for (PromoCodeEventJoin join : eventJoins) {
+                    applicableEventIds.add(join.getEvent().getId());
+                }
+                if (!applicableEventIds.contains(event.getId())) {
+                    throw new BadRequestException("This promo code is not applicable to this event");
+                }
+            }
+            // GLOBAL: áp dụng cho tất cả events, không cần kiểm tra thêm
 
             // Calculate discount
             BigDecimal discount;

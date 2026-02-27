@@ -2,6 +2,7 @@ package com.example.e_ticket_booking_system.dto.response;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -23,5 +24,9 @@ public class PromoCodeResponse {
     private LocalDateTime validFrom;
     private LocalDateTime validTo;
     private String status;
+    private String applicationType; // GLOBAL, ORGANIZER_ALL, SPECIFIC_EVENTS
+    private Long createdByUserId;
+    private String createdByName;
+    private List<Long> eventIds; // danh sách event áp dụng (nếu SPECIFIC_EVENTS)
     private LocalDateTime createdAt;
 }

@@ -1,5 +1,7 @@
 package com.example.e_ticket_booking_system.controller;
 
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.e_ticket_booking_system.dto.request.LoginRequest;
 import com.example.e_ticket_booking_system.dto.request.RefreshTokenRequest;
 import com.example.e_ticket_booking_system.dto.request.RegisterRequest;
+import com.example.e_ticket_booking_system.dto.request.VerifyOtpRequest;
 import com.example.e_ticket_booking_system.dto.response.ApiResponse;
 import com.example.e_ticket_booking_system.dto.response.AuthResponse;
 import com.example.e_ticket_booking_system.service.AuthService;
@@ -45,5 +48,17 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout() {
         // Client-side token removal; server-side invalidation would require a blacklist
         return ResponseEntity.ok(ApiResponse.success("Logout successful"));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@Valid @RequestBody VerifyOtpRequest request) {
+        authService.verifyEmail(request.getEmail(), request.getOtp());
+        return ResponseEntity.ok(ApiResponse.success("Xác nhận email thành công"));
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<ApiResponse<Void>> resendOtp(@RequestBody Map<String, String> body) {
+        authService.resendOtp(body.get("email"));
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi lại OTP"));
     }
 }

@@ -35,7 +35,7 @@
 	"item": [
 		{
 			"name": "Auth",
-			"description": "Authentication endpoints: register, login, refresh token, logout",
+			"description": "Authentication endpoints: register, login, verify email, resend OTP, refresh token, logout",
 			"item": [
 				{
 					"name": "Register",
@@ -74,7 +74,59 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "auth", "register"]
 						},
-						"description": "Register a new user account. Returns access token and refresh token."
+						"description": "Register a new user account. User status is set to INACTIVE. An OTP is sent to the email for verification. Returns access token and refresh token."
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Email (OTP)",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@example.com\",\n    \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/verify-email",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "verify-email"]
+						},
+						"description": "Verify email address using the 6-digit OTP sent during registration. Sets user status to ACTIVE."
+					},
+					"response": []
+				},
+				{
+					"name": "Resend OTP",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/resend-otp",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "resend-otp"]
+						},
+						"description": "Resend OTP verification email. Only works for users with INACTIVE status."
 					},
 					"response": []
 				},
@@ -1049,37 +1101,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"eventId\": 1,\n    \"scheduleId\": 1,\n    \"items\": [\n        {\n            \"ticketTypeId\": 1,\n            \"quantity\": 2\n        }\n    ],\n    \"seatIds\": [1, 2]\n}"
+							"raw": "{\n    \"eventId\": 1,\n    \"scheduleId\": 1,\n    \"items\": [\n        {\n            \"ticketTypeId\": 1,\n            \"quantity\": 2\n        }\n    ],\n    \"seatIds\": [1, 2],\n    \"promoCodeId\": null\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/bookings",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "bookings"]
 						},
-						"description": "Create a new booking. Requires authentication. seatIds is optional (for seat map events only)."
-					},
-					"response": []
-				},
-				{
-					"name": "Apply Promo Code",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"bookingId\": 1,\n    \"promoCode\": \"SUMMER2026\"\n}"
-						},
-						"url": {
-							"raw": "{{baseUrl}}/api/bookings/apply-promo",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "bookings", "apply-promo"]
-						},
-						"description": "Apply a promo code to a booking. Requires authentication."
+						"description": "Create a new booking. Requires authentication. seatIds is optional (for seat map events). promoCodeId is optional (promo is validated and applied at booking creation, usedCount incremented on payment success)."
 					},
 					"response": []
 				},
@@ -1357,6 +1386,29 @@
 							"path": ["api", "promo-codes", "1", "deactivate"]
 						},
 						"description": "Deactivate a promo code. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Available Promo Codes",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"eventId\": 1,\n    \"items\": [\n        {\n            \"ticketTypeId\": 1,\n            \"quantity\": 2\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/available",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "available"]
+						},
+						"description": "Get available promo codes for an order with discount preview. Requires authentication (any logged-in user, not ADMIN-only). Returns totalAmount and list of applicable promo codes with discountAmount and finalAmount."
 					},
 					"response": []
 				}

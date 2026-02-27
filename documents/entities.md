@@ -6,14 +6,30 @@ Quản lý tất cả người dùng trong hệ thống
 
 ### Logic nghiệp vụ
 - **Phân quyền đa vai trò:** CUSTOMER (khách hàng), ORGANIZER (nhà tổ chức), ADMIN (quản trị viên), STAFF (nhân viên soát vé)
-- **Quản lý trạng thái:** ACTIVE (hoạt động), INACTIVE (tạm ngưng), BANNED (bị cấm)
+- **Quản lý trạng thái:** ACTIVE (hoạt động), INACTIVE (chờ xác nhận email), BANNED (bị cấm)
 - **Email unique** để đăng nhập và liên hệ
-- **Password** được mã hóa (khuyến nghị BCrypt)
+- **Password** được mã hóa (BCrypt)
 - Lưu thông tin cơ bản: fullName, phoneNumber
+- Khi đăng ký mới, user có status = **INACTIVE** cho đến khi xác nhận email qua OTP
 
 ---
 
-## 2. EventCategory Entity
+## 2. EmailOtp Entity
+### Tác dụng
+Lưu trữ mã OTP xác thực email khi đăng ký tài khoản
+
+### Logic nghiệp vụ
+- **email**: Email cần xác thực
+- **otp**: Mã OTP 6 số ngẫu nhiên
+- **expiresAt**: Thời điểm hết hạn (mặc định 5 phút sau khi tạo)
+- **used**: Flag đánh dấu OTP đã được sử dụng hay chưa
+- Khi tạo OTP mới cho cùng email → xóa OTP cũ trước
+- OTP chỉ valid khi: `used = false` AND `expiresAt > now()`
+- Sau khi verify thành công → đánh dấu `used = true`
+
+---
+
+## 3. EventCategory Entity
 ### Tác dụng
 Phân loại sự kiện theo thể loại (Concert, Sports, Theater, Conference, Cinema, Tour)
 
@@ -25,7 +41,7 @@ Phân loại sự kiện theo thể loại (Concert, Sports, Theater, Conference
 
 ---
 
-## 3. Venue Entity
+## 4. Venue Entity
 ### Tác dụng
 Quản lý địa điểm tổ chức sự kiện
 
@@ -39,7 +55,7 @@ Quản lý địa điểm tổ chức sự kiện
 
 ---
 
-## 4. Section Entity
+## 5. Section Entity
 ### Tác dụng
 Phân khu vực trong venue (VIP Zone, Section A/B/C)
 
@@ -54,7 +70,7 @@ Phân khu vực trong venue (VIP Zone, Section A/B/C)
 
 ---
 
-## 5. Seat Entity
+## 6. Seat Entity
 ### Tác dụng
 Quản lý từng ghế ngồi cụ thể trong venue
 
@@ -68,7 +84,7 @@ Quản lý từng ghế ngồi cụ thể trong venue
 
 ---
 
-## 6. Event Entity
+## 7. Event Entity
 ### Tác dụng
 Entity trung tâm - Quản lý sự kiện
 
@@ -86,7 +102,7 @@ Entity trung tâm - Quản lý sự kiện
 
 ---
 
-## 7. EventSchedule Entity
+## 8. EventSchedule Entity
 ### Tác dụng
 Quản lý lịch chiếu/suất diễn của event
 
@@ -99,7 +115,7 @@ Quản lý lịch chiếu/suất diễn của event
 
 ---
 
-## 8. TicketType Entity
+## 9. TicketType Entity
 ### Tác dụng
 Định nghĩa các loại vé và giá cho event
 
@@ -114,7 +130,7 @@ Quản lý lịch chiếu/suất diễn của event
 
 ---
 
-## 9. PromoCode Entity
+## 10. PromoCode Entity
 ### Tác dụng
 Quản lý mã giảm giá/voucher
 
@@ -126,11 +142,12 @@ Quản lý mã giảm giá/voucher
 - **usageLimit & usedCount**: Kiểm soát số lần sử dụng
 - **validFrom & validTo**: Thời hạn sử dụng
 - **Status:** ACTIVE, EXPIRED, DISABLED
-- Tự động update usedCount khi booking confirmed
+- Tự động update `usedCount` khi **payment callback SUCCESS** (không phải lúc tạo booking)
+- Scheduled job tự động chuyển ACTIVE → EXPIRED khi `validTo` đã qua (chạy hàng ngày lúc 00:00)
 
 ---
 
-## 10. Booking Entity
+## 11. Booking Entity
 ### Tác dụng
 Đơn đặt vé - Entity trung tâm của booking flow
 
@@ -143,13 +160,14 @@ Quản lý mã giảm giá/voucher
   - totalAmount = Tổng tiền gốc
   - discountAmount = Số tiền giảm từ promo code
   - finalAmount = totalAmount - discountAmount
+- **Promo code:** Có thể truyền `promoCodeId` khi tạo booking (`POST /api/bookings`). Nếu có, hệ thống validate và tính discount ngay lúc tạo booking, tạo BookingPromoCode record. `usedCount` chỉ tăng khi thanh toán thành công.
 - **Status workflow:** PENDING (hold ghế) → CONFIRMED (đã thanh toán) → CANCELLED/EXPIRED
 - **holdExpiresAt**: Timeout tự động release nếu không thanh toán (10-15 phút)
 - Background job tự động chuyển PENDING → EXPIRED khi hết timeout
 
 ---
 
-## 11. BookingDetail Entity
+## 12. BookingDetail Entity
 ### Tác dụng
 Chi tiết các loại vé trong một booking (Order Line Items)
 
@@ -163,7 +181,7 @@ Chi tiết các loại vé trong một booking (Order Line Items)
 
 ---
 
-## 12. BookingPromoCode Entity
+## 13. BookingPromoCode Entity
 ### Tác dụng
 Junction table - Liên kết booking với promo code đã sử dụng
 
@@ -175,7 +193,7 @@ Junction table - Liên kết booking với promo code đã sử dụng
 
 ---
 
-## 13. Payment Entity
+## 14. Payment Entity
 ### Tác dụng
 Quản lý giao dịch thanh toán
 
@@ -188,7 +206,7 @@ Quản lý giao dịch thanh toán
 
 ---
 
-## 14. Ticket Entity
+## 15. Ticket Entity
 ### Tác dụng
 Vé điện tử cá nhân - Sản phẩm cuối cùng user nhận được
 
@@ -210,7 +228,7 @@ Vé điện tử cá nhân - Sản phẩm cuối cùng user nhận được
 
 ---
 
-## 15. SeatReservation Entity
+## 16. SeatReservation Entity
 ### Tác dụng
 Quản lý việc hold/reserve ghế - Giải quyết race condition
 
@@ -226,7 +244,7 @@ Quản lý việc hold/reserve ghế - Giải quyết race condition
 
 ---
 
-## 16. TicketListing Entity
+## 17. TicketListing Entity
 ### Tác dụng
 Secondary market - User đăng vé để bán/trao đổi
 
@@ -241,11 +259,11 @@ Secondary market - User đăng vé để bán/trao đổi
 - **listingPrice:** Giá người bán đặt (market-driven, có thể > hoặc < giá gốc)
 - **Status:** FOR_SALE → SOLD/CANCELLED/EXPIRED
 - **expiresAt:** Auto-expire listing (VD: 1 ngày trước event)
-- Background job tự động expire listings
+- Scheduled job tự động expire listings: FOR_SALE → EXPIRED khi `expiresAt` đã qua (chạy hàng giờ)
 
 ---
 
-## 17. TicketExchange Entity
+## 18. TicketExchange Entity
 ### Tác dụng
 Ghi nhận giao dịch trao đổi vé trên secondary market
 
@@ -267,7 +285,7 @@ Ghi nhận giao dịch trao đổi vé trên secondary market
 
 ---
 
-## 18. TicketTransferLog Entity
+## 19. TicketTransferLog Entity
 ### Tác dụng
 Audit trail - Immutable log cho việc chuyển nhượng vé
 

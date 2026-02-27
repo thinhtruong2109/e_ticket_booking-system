@@ -31,6 +31,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final OtpService otpService;
 
     public AuthResponse register(RegisterRequest request) {
         log.info("Registering user with email: {}", request.getEmail());
@@ -48,10 +49,12 @@ public class AuthService {
         user.setFullName(request.getFullName());
         user.setPhoneNumber(request.getPhoneNumber());
         user.setRole("CUSTOMER");
-        user.setStatus("ACTIVE");
+        user.setStatus("INACTIVE"); // Chờ xác nhận email
 
         user = userRepository.save(user);
-        log.info("User registered successfully: {}", user.getEmail());
+        log.info("User registered successfully (pending verification): {}", user.getEmail());
+
+        otpService.generateAndSendOtp(user.getEmail()); // Gửi OTP
 
         String accessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
@@ -115,6 +118,27 @@ public class AuthService {
         if (!password.matches(".*\\d.*")) {
             throw new BadRequestException("Password must contain at least one digit");
         }
+    }
+
+    public void verifyEmail(String email, String otp) {
+        boolean valid = otpService.verifyOtp(email, otp);
+        if (!valid) throw new BadRequestException("OTP không hợp lệ hoặc đã hết hạn");
+
+        User user = userRepository.findByEmail(email);
+        if (user == null) throw new BadRequestException("Email không tồn tại");
+
+        user.setStatus("ACTIVE");
+        userRepository.save(user);
+        log.info("Email verified successfully: {}", email);
+    }
+
+    public void resendOtp(String email) {
+        User user = userRepository.findByEmail(email);
+        if (user == null) throw new BadRequestException("Email không tồn tại");
+        if ("ACTIVE".equals(user.getStatus())) throw new BadRequestException("Email đã được xác nhận");
+
+        otpService.generateAndSendOtp(email);
+        log.info("OTP resent to: {}", email);
     }
 
     private UserResponse toUserResponse(User user) {

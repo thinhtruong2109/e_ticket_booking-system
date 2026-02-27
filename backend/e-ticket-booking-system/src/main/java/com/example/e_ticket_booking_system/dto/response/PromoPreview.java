@@ -13,6 +13,7 @@ public class PromoPreview {
     private Long id;
     private String code;
     private String description;
+    private String applicationType; // GLOBAL, ORGANIZER_ALL, SPECIFIC_EVENTS
     private BigDecimal discountAmount;
     private BigDecimal finalAmount;
 }

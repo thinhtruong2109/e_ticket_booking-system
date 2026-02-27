@@ -132,7 +132,7 @@ Quản lý lịch chiếu/suất diễn của event
 
 ## 10. PromoCode Entity
 ### Tác dụng
-Quản lý mã giảm giá/voucher
+Quản lý mã giảm giá/voucher — hỗ trợ phân quyền Admin/Organizer và phạm vi áp dụng linh hoạt
 
 ### Logic nghiệp vụ
 - **discountType**: PERCENTAGE (%) hoặc FIXED_AMOUNT (số tiền cố định)
@@ -142,8 +142,33 @@ Quản lý mã giảm giá/voucher
 - **usageLimit & usedCount**: Kiểm soát số lần sử dụng
 - **validFrom & validTo**: Thời hạn sử dụng
 - **Status:** ACTIVE, EXPIRED, DISABLED
+- **created_by** *(FK → users.id, NOT NULL)*: Người tạo promo code. Admin tạo GLOBAL, Organizer tạo ORGANIZER_ALL hoặc SPECIFIC_EVENTS
+- **applicationType**: Phân loại phạm vi áp dụng:
+  - `GLOBAL`: Admin tạo, áp dụng cho **tất cả** event trên hệ thống
+  - `ORGANIZER_ALL`: Organizer tạo, áp dụng cho **tất cả event** do organizer đó tổ chức
+  - `SPECIFIC_EVENTS`: Organizer tạo, chỉ áp dụng cho **các event cụ thể** (qua bảng PromoCodeEventJoin)
+- **Phân quyền CRUD:**
+  - ADMIN: Chỉ tạo GLOBAL promo codes. Có quyền xem/sửa/deactivate tất cả promo codes
+  - ORGANIZER: Tạo ORGANIZER_ALL hoặc SPECIFIC_EVENTS. Chỉ CRUD promo codes do chính mình tạo (kiểm tra `createdBy.id`)
 - Tự động update `usedCount` khi **payment callback SUCCESS** (không phải lúc tạo booking)
 - Scheduled job tự động chuyển ACTIVE → EXPIRED khi `validTo` đã qua (chạy hàng ngày lúc 00:00)
+
+---
+
+## 10.1. PromoCodeEventJoin Entity
+### Tác dụng
+Bảng join many-to-many giữa PromoCode và Event — chỉ dùng khi `applicationType = SPECIFIC_EVENTS`
+
+### Logic nghiệp vụ
+- **promo_code_id** *(FK → promo_codes.id, NOT NULL)*: Promo code nào
+- **event_id** *(FK → events.id, NOT NULL)*: Event nào được áp dụng
+- **Unique constraint:** Một cặp (promo_code_id, event_id) chỉ tồn tại 1 lần
+- **Khi nào cần bảng này:**
+  - Organizer có 5 events nhưng chỉ muốn áp promo cho event 2 và 4 → cần lưu cụ thể
+- **Khi nào KHÔNG cần:**
+  - `GLOBAL`: Áp dụng tất cả → không cần lưu gì thêm
+  - `ORGANIZER_ALL`: Lọc theo `createdBy.id == event.organizer.id` là đủ
+- Khi Organizer cập nhật promo từ SPECIFIC_EVENTS sang loại khác, xóa hết records cũ
 
 ---
 
@@ -160,7 +185,7 @@ Quản lý mã giảm giá/voucher
   - totalAmount = Tổng tiền gốc
   - discountAmount = Số tiền giảm từ promo code
   - finalAmount = totalAmount - discountAmount
-- **Promo code:** Có thể truyền `promoCodeId` khi tạo booking (`POST /api/bookings`). Nếu có, hệ thống validate và tính discount ngay lúc tạo booking, tạo BookingPromoCode record. `usedCount` chỉ tăng khi thanh toán thành công.
+- **Promo code:** Có thể truyền `promoCodeId` khi tạo booking (`POST /api/bookings`). Nếu có, hệ thống validate promo code (status, thời hạn, usage limit, minOrderAmount) **và kiểm tra applicationType** (GLOBAL → tất cả event; ORGANIZER_ALL → đúng organizer; SPECIFIC_EVENTS → đúng event trong bảng PromoCodeEventJoin), tính discount và tạo BookingPromoCode record. `usedCount` chỉ tăng khi thanh toán thành công.
 - **Status workflow:** PENDING (hold ghế) → CONFIRMED (đã thanh toán) → CANCELLED/EXPIRED
 - **holdExpiresAt**: Timeout tự động release nếu không thanh toán (10-15 phút)
 - Background job tự động chuyển PENDING → EXPIRED khi hết timeout

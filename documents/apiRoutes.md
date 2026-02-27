@@ -663,7 +663,7 @@
 }
 ```
 
-> **Lưu ý:** Nếu có `promoCodeId`, hệ thống sẽ validate promo code (status ACTIVE, thời hạn, usage limit, min order amount), tính discount và tạo `BookingPromoCode` record. `usedCount` của promo code chỉ được tăng khi thanh toán thành công (payment callback SUCCESS).
+> **Lưu ý:** Nếu có `promoCodeId`, hệ thống sẽ validate promo code (status ACTIVE, thời hạn, usage limit, min order amount) **và kiểm tra applicationType** (GLOBAL → tất cả event; ORGANIZER_ALL → event phải do đúng organizer tổ chức; SPECIFIC_EVENTS → event phải nằm trong danh sách PromoCodeEventJoin). Tính discount và tạo `BookingPromoCode` record. `usedCount` của promo code chỉ được tăng khi thanh toán thành công (payment callback SUCCESS).
 
 ---
 
@@ -977,14 +977,17 @@
 
 ## 12. Promo Codes
 
-> ⚠️ **Các API quản lý (CRUD) yêu cầu role `ADMIN`. API xem promo khả dụng (`POST /available`) chỉ cần đăng nhập.**
+> ⚠️ **Promo codes được phân quyền theo role:**
+> - **ADMIN:** CRUD tất cả promo codes, chỉ tạo loại `GLOBAL` (áp dụng toàn hệ thống)
+> - **ORGANIZER:** CRUD promo codes **do mình tạo**, tạo loại `ORGANIZER_ALL` hoặc `SPECIFIC_EVENTS`
+> - **Authenticated users:** Xem promo codes khả dụng cho đơn hàng (`POST /available`)
 
-### 12.1. Tạo mã giảm giá
+### 12.1. [ADMIN] Tạo mã giảm giá
 
 | | |
 |---|---|
-| **URL** | `POST /api/promo-codes` |
-| **Mô tả** | Tạo mã khuyến mãi mới |
+| **URL** | `POST /api/promo-codes/admin` |
+| **Mô tả** | Admin tạo promo code GLOBAL (áp dụng tất cả event) |
 | **Authorization** | ✅ `Bearer <token>` |
 | **Role** | 🔒 `ADMIN` |
 | **Header** | `Authorization: Bearer <token>`, `Content-Type: application/json` |
@@ -1000,29 +1003,32 @@
   "maxDiscountAmount": 500000,             // ❌ Không bắt buộc
   "usageLimit": 100,                       // ❌ Không bắt buộc
   "validFrom": "2026-01-01T00:00:00",      // ✅ Bắt buộc (ISO 8601)
-  "validTo": "2026-12-31T23:59:59"         // ✅ Bắt buộc (ISO 8601)
+  "validTo": "2026-12-31T23:59:59",        // ✅ Bắt buộc (ISO 8601)
+  "applicationType": "GLOBAL"              // ✅ Bắt buộc (Admin chỉ được tạo GLOBAL)
 }
 ```
 
+> **Lưu ý:** Admin chỉ được tạo `applicationType = GLOBAL`. Nếu truyền loại khác sẽ trả lỗi 400.
+
 ---
 
-### 12.2. Lấy tất cả promo codes
+### 12.2. [ADMIN] Lấy tất cả promo codes
 
 | | |
 |---|---|
-| **URL** | `GET /api/promo-codes` |
-| **Mô tả** | Lấy danh sách tất cả mã giảm giá |
+| **URL** | `GET /api/promo-codes/admin` |
+| **Mô tả** | Lấy danh sách tất cả mã giảm giá (bao gồm cả của Organizer) |
 | **Authorization** | ✅ `Bearer <token>` |
 | **Role** | 🔒 `ADMIN` |
 | **Request Body** | Không có |
 
 ---
 
-### 12.3. Lấy promo codes đang hoạt động
+### 12.3. [ADMIN] Lấy promo codes đang hoạt động
 
 | | |
 |---|---|
-| **URL** | `GET /api/promo-codes/active` |
+| **URL** | `GET /api/promo-codes/admin/active` |
 | **Mô tả** | Lấy danh sách mã giảm giá đang ACTIVE |
 | **Authorization** | ✅ `Bearer <token>` |
 | **Role** | 🔒 `ADMIN` |
@@ -1030,12 +1036,12 @@
 
 ---
 
-### 12.4. Xem chi tiết promo code
+### 12.4. [ADMIN] Xem chi tiết promo code
 
 | | |
 |---|---|
-| **URL** | `GET /api/promo-codes/{id}` |
-| **Mô tả** | Lấy thông tin chi tiết một mã giảm giá |
+| **URL** | `GET /api/promo-codes/admin/{id}` |
+| **Mô tả** | Lấy thông tin chi tiết một mã giảm giá bất kỳ |
 | **Authorization** | ✅ `Bearer <token>` |
 | **Role** | 🔒 `ADMIN` |
 | **Path Variable** | `id` — Promo Code ID |
@@ -1043,11 +1049,25 @@
 
 ---
 
-### 12.5. Vô hiệu hóa promo code
+### 12.5. [ADMIN] Cập nhật promo code
 
 | | |
 |---|---|
-| **URL** | `PUT /api/promo-codes/{id}/deactivate` |
+| **URL** | `PUT /api/promo-codes/admin/{id}` |
+| **Mô tả** | Cập nhật thông tin promo code bất kỳ |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ADMIN` |
+| **Path Variable** | `id` — Promo Code ID |
+
+**Request Body:** Giống request tạo (12.1)
+
+---
+
+### 12.6. [ADMIN] Vô hiệu hóa promo code
+
+| | |
+|---|---|
+| **URL** | `PUT /api/promo-codes/admin/{id}/deactivate` |
 | **Mô tả** | Chuyển mã giảm giá sang trạng thái DISABLED |
 | **Authorization** | ✅ `Bearer <token>` |
 | **Role** | 🔒 `ADMIN` |
@@ -1056,14 +1076,100 @@
 
 ---
 
-### 12.6. Xem promo codes khả dụng cho đơn hàng
+### 12.7. [ORGANIZER] Tạo mã giảm giá
+
+| | |
+|---|---|
+| **URL** | `POST /api/promo-codes/organizer` |
+| **Mô tả** | Organizer tạo promo code cho events của mình |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` |
+| **Header** | `Authorization: Bearer <token>`, `Content-Type: application/json` |
+
+**Request Body:**
+```json
+{
+  "code": "MYEVENT20",
+  "description": "Giảm 20% cho event của tôi",
+  "discountType": "PERCENTAGE",
+  "discountValue": 20,
+  "minOrderAmount": 100000,
+  "maxDiscountAmount": 500000,
+  "usageLimit": 50,
+  "validFrom": "2026-01-01T00:00:00",
+  "validTo": "2026-06-30T23:59:59",
+  "applicationType": "SPECIFIC_EVENTS",    // ✅ Bắt buộc (ORGANIZER_ALL hoặc SPECIFIC_EVENTS)
+  "eventIds": [1, 3, 5]                    // ⚠️ Bắt buộc nếu SPECIFIC_EVENTS (events phải thuộc organizer)
+}
+```
+
+> **Lưu ý:**
+> - `ORGANIZER_ALL`: Áp dụng cho tất cả events của organizer hiện tại, không cần `eventIds`
+> - `SPECIFIC_EVENTS`: Phải truyền `eventIds`, hệ thống validate tất cả events thuộc organizer
+> - Organizer KHÔNG được tạo `GLOBAL` (trả lỗi 400)
+
+---
+
+### 12.8. [ORGANIZER] Lấy promo codes của mình
+
+| | |
+|---|---|
+| **URL** | `GET /api/promo-codes/organizer` |
+| **Mô tả** | Lấy danh sách promo codes do organizer hiện tại tạo |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` |
+| **Request Body** | Không có |
+
+---
+
+### 12.9. [ORGANIZER] Xem chi tiết promo code của mình
+
+| | |
+|---|---|
+| **URL** | `GET /api/promo-codes/organizer/{id}` |
+| **Mô tả** | Lấy thông tin promo code (chỉ của mình, trả 403 nếu không phải) |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` |
+| **Path Variable** | `id` — Promo Code ID |
+| **Request Body** | Không có |
+
+---
+
+### 12.10. [ORGANIZER] Cập nhật promo code của mình
+
+| | |
+|---|---|
+| **URL** | `PUT /api/promo-codes/organizer/{id}` |
+| **Mô tả** | Cập nhật promo code (chỉ của mình) |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` |
+| **Path Variable** | `id` — Promo Code ID |
+
+**Request Body:** Giống request tạo (12.7)
+
+---
+
+### 12.11. [ORGANIZER] Vô hiệu hóa promo code của mình
+
+| | |
+|---|---|
+| **URL** | `PUT /api/promo-codes/organizer/{id}/deactivate` |
+| **Mô tả** | Chuyển promo code sang DISABLED (chỉ của mình) |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` |
+| **Path Variable** | `id` — Promo Code ID |
+| **Request Body** | Không có |
+
+---
+
+### 12.12. Xem promo codes khả dụng cho đơn hàng
 
 | | |
 |---|---|
 | **URL** | `POST /api/promo-codes/available` |
 | **Mô tả** | Lấy danh sách promo code có thể áp dụng cho đơn hàng, kèm preview số tiền giảm |
 | **Authorization** | ✅ `Bearer <token>` |
-| **Role** | 🔓 Bất kỳ user đã đăng nhập (không yêu cầu ADMIN) |
+| **Role** | 🔓 Bất kỳ user đã đăng nhập |
 | **Header** | `Authorization: Bearer <token>`, `Content-Type: application/json` |
 
 **Request Body:**
@@ -1088,6 +1194,15 @@
       "id": 1,
       "code": "SALE2026",
       "description": "Giảm giá Tết 2026",
+      "applicationType": "GLOBAL",
+      "discountAmount": 200000,
+      "finalAmount": 800000
+    },
+    {
+      "id": 5,
+      "code": "MYEVENT20",
+      "description": "Giảm 20% cho event này",
+      "applicationType": "SPECIFIC_EVENTS",
       "discountAmount": 200000,
       "finalAmount": 800000
     }
@@ -1095,7 +1210,12 @@
 }
 ```
 
-> **Logic:** Hệ thống tính `totalAmount` từ items (quantity × price), lọc promos ACTIVE còn hạn, chưa hết lượt dùng, đủ `minOrderAmount`, rồi tính preview `discountAmount` và `finalAmount` cho mỗi promo.
+> **Logic lọc promo codes khả dụng:**
+> 1. `GLOBAL`: Áp dụng tất cả events → luôn hiển thị nếu ACTIVE, còn hạn, còn lượt, đủ minOrderAmount
+> 2. `ORGANIZER_ALL`: Chỉ hiển thị nếu `createdBy.id == event.organizer.id`
+> 3. `SPECIFIC_EVENTS`: Chỉ hiển thị nếu event đang đặt nằm trong bảng PromoCodeEventJoin
+>
+> Promo code của Organizer khác tạo cho event khác sẽ **không bao giờ** hiển thị.
 
 ---
 

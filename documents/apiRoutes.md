@@ -1393,17 +1393,23 @@
 | 53 | POST | `/api/seats` | ✅ | ORGANIZER/ADMIN |
 | 54 | GET | `/api/seats/venue/{venueId}` | ✅ | Any |
 | 55 | GET | `/api/seats/available?scheduleId=` | ✅ | Any |
-| 56 | POST | `/api/promo-codes` | ✅ | ADMIN |
-| 57 | GET | `/api/promo-codes` | ✅ | ADMIN |
-| 58 | GET | `/api/promo-codes/active` | ✅ | ADMIN |
-| 59 | GET | `/api/promo-codes/{id}` | ✅ | ADMIN |
-| 60 | PUT | `/api/promo-codes/{id}/deactivate` | ✅ | ADMIN |
-| 61 | POST | `/api/promo-codes/available` | ✅ | Any (đã đăng nhập) |
-| 62 | GET | `/api/ticket-listings` | ❌ | — |
-| 63 | GET | `/api/ticket-listings/{id}` | ❌ | — |
-| 64 | GET | `/api/ticket-listings/my-listings` | ✅ | Any |
-| 65 | POST | `/api/ticket-listings` | ✅ | Any |
-| 66 | DELETE | `/api/ticket-listings/{id}` | ✅ | Any |
-| 67 | POST | `/api/ticket-listings/exchanges` | ✅ | Any |
-| 68 | PUT | `/api/ticket-listings/exchanges/{id}/complete` | ✅ | Any |
-| 69 | DELETE | `/api/ticket-listings/exchanges/{id}` | ✅ | Any |
+| 56 | POST | `/api/promo-codes/admin` | ✅ | ADMIN |
+| 57 | GET | `/api/promo-codes/admin` | ✅ | ADMIN |
+| 58 | GET | `/api/promo-codes/admin/active` | ✅ | ADMIN |
+| 59 | GET | `/api/promo-codes/admin/{id}` | ✅ | ADMIN |
+| 60 | PUT | `/api/promo-codes/admin/{id}` | ✅ | ADMIN |
+| 61 | PUT | `/api/promo-codes/admin/{id}/deactivate` | ✅ | ADMIN |
+| 62 | POST | `/api/promo-codes/organizer` | ✅ | ORGANIZER |
+| 63 | GET | `/api/promo-codes/organizer` | ✅ | ORGANIZER |
+| 64 | GET | `/api/promo-codes/organizer/{id}` | ✅ | ORGANIZER |
+| 65 | PUT | `/api/promo-codes/organizer/{id}` | ✅ | ORGANIZER |
+| 66 | PUT | `/api/promo-codes/organizer/{id}/deactivate` | ✅ | ORGANIZER |
+| 67 | POST | `/api/promo-codes/available` | ✅ | Any (đã đăng nhập) |
+| 68 | GET | `/api/ticket-listings` | ❌ | — |
+| 69 | GET | `/api/ticket-listings/{id}` | ❌ | — |
+| 70 | GET | `/api/ticket-listings/my-listings` | ✅ | Any |
+| 71 | POST | `/api/ticket-listings` | ✅ | Any |
+| 72 | DELETE | `/api/ticket-listings/{id}` | ✅ | Any |
+| 73 | POST | `/api/ticket-listings/exchanges` | ✅ | Any |
+| 74 | PUT | `/api/ticket-listings/exchanges/{id}/complete` | ✅ | Any |
+| 75 | DELETE | `/api/ticket-listings/exchanges/{id}` | ✅ | Any |

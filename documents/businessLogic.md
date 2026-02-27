@@ -515,41 +515,102 @@
 
 ## 🎁 **14. PROMO CODE SERVICE**
 
+> **Phân quyền CRUD:**
+> - **ADMIN:** Chỉ tạo `GLOBAL` promo codes. Có quyền xem/sửa/deactivate **tất cả** promo codes (kể cả của Organizer)
+> - **ORGANIZER:** Tạo `ORGANIZER_ALL` hoặc `SPECIFIC_EVENTS`. Chỉ CRUD promo codes **do chính mình tạo** (kiểm tra `createdBy.id`)
+
 ### **14.1. Admin: Create Promo Code**
-- Generate unique code hoặc custom code
-- Set discount_type (PERCENTAGE/FIXED_AMOUNT)
-- Set discount_value
-- Set min_order_amount, max_discount_amount
-- Set usage_limit
+- **Endpoint:** `POST /api/promo-codes/admin` (Role: ADMIN)
+- Validate code unique (auto UPPERCASE)
+- Validate `validTo` > `validFrom`
+- **Admin chỉ được tạo `applicationType = GLOBAL`** → nếu truyền loại khác → lỗi 400
+- Set discount_type (PERCENTAGE / FIXED_AMOUNT)
+- Set discount_value, min_order_amount, max_discount_amount
+- Set usage_limit, usedCount = 0
 - Set valid_from, valid_to
 - Set status = ACTIVE
+- Set createdBy = admin user
+- Lưu promo code vào DB
 
-### **14.2. Validate Promo Code**
+### **14.2. Organizer: Create Promo Code**
+- **Endpoint:** `POST /api/promo-codes/organizer` (Role: ORGANIZER)
+- Validate code unique (auto UPPERCASE)
+- Validate `validTo` > `validFrom`
+- **Organizer KHÔNG được tạo `GLOBAL`** → lỗi 400
+- `applicationType` phải là `ORGANIZER_ALL` hoặc `SPECIFIC_EVENTS`
+- Nếu `SPECIFIC_EVENTS`:
+  - `eventIds` bắt buộc, không được rỗng
+  - Validate tất cả events thuộc về organizer hiện tại (`event.organizer.id == organizerId`) → nếu sai → lỗi 403
+  - Tạo records trong bảng `PromoCodeEventJoin` cho từng event
+- Set createdBy = organizer user
+- Các field khác giống 14.1
+
+### **14.3. Admin: List/Get Promo Codes**
+- `GET /api/promo-codes/admin` — Lấy **tất cả** promo codes (kể cả của Organizer)
+- `GET /api/promo-codes/admin/active` — Lấy promo codes đang ACTIVE
+- `GET /api/promo-codes/admin/{id}` — Xem chi tiết promo code bất kỳ
+
+### **14.4. Organizer: List/Get Promo Codes**
+- `GET /api/promo-codes/organizer` — Lấy promo codes **do mình tạo** (`createdBy.id == organizerId`)
+- `GET /api/promo-codes/organizer/{id}` — Xem chi tiết promo code (chỉ của mình, trả 403 nếu không phải)
+
+### **14.5. Admin: Update Promo Code**
+- **Endpoint:** `PUT /api/promo-codes/admin/{id}` (Role: ADMIN)
+- Admin có thể sửa bất kỳ promo code nào
+- Validate `validTo` > `validFrom`, code unique nếu đổi code
+- Cập nhật event mappings nếu `SPECIFIC_EVENTS` (xóa cũ, tạo mới)
+
+### **14.6. Organizer: Update Promo Code**
+- **Endpoint:** `PUT /api/promo-codes/organizer/{id}` (Role: ORGANIZER)
+- Chỉ sửa promo code **do mình tạo** (`createdBy.id == organizerId`) → nếu sai → lỗi 403
+- **Không được đổi sang `GLOBAL`** → lỗi 400
+- Validate `validTo` > `validFrom`, code unique nếu đổi code
+- Nếu `SPECIFIC_EVENTS`:
+  - Xóa event mappings cũ, tạo mới
+  - Validate tất cả events thuộc về organizer
+
+### **14.7. Admin/Organizer: Deactivate Promo Code**
+- **Admin:** `PUT /api/promo-codes/admin/{id}/deactivate` — Deactivate bất kỳ promo code
+- **Organizer:** `PUT /api/promo-codes/organizer/{id}/deactivate` — Deactivate promo code **do mình tạo** (chỉ kiểm tra `createdBy.id`)
+- Update status = DISABLED
+
+### **14.8. Validate Promo Code (Internal)**
 - Check code exists
 - Check status = ACTIVE
 - Check now between valid_from and valid_to
 - Check used_count < usage_limit
 - Check booking amount >= min_order_amount
+- **Check applicationType:**
+  - `GLOBAL`: Áp dụng mọi event → pass
+  - `ORGANIZER_ALL`: Check `promo.createdBy.id == event.organizer.id`
+  - `SPECIFIC_EVENTS`: Check event.id có trong bảng PromoCodeEventJoin
 
-### **14.3. Get Available Promo Codes**
-- **Endpoint:** `POST /api/promo-codes/available`
-- **Permission:** Bất kỳ user đã đăng nhập (không cần ADMIN)
+### **14.9. Get Available Promo Codes (Preview)**
+- **Endpoint:** `POST /api/promo-codes/available` (Role: bất kỳ user đã đăng nhập)
 - Input: eventId + list items (ticketTypeId, quantity)
 - Tính totalAmount từ items (quantity × ticketType.price)
-- Lọc promos: status = ACTIVE, còn hạn valid_from/valid_to, usedCount < usageLimit, totalAmount >= minOrderAmount
+- Xác định organizer của event (từ event.organizer.id)
+- **Lọc promo codes theo 3 loại:**
+  1. `GLOBAL`: status = ACTIVE, còn hạn → áp dụng tất cả events
+  2. `ORGANIZER_ALL`: status = ACTIVE, còn hạn, `createdBy.id == event.organizer.id`
+  3. `SPECIFIC_EVENTS`: status = ACTIVE, còn hạn, event phải có trong bảng PromoCodeEventJoin
+- Filter thêm: chưa hết lượt dùng (`usedCount < usageLimit`), đủ `minOrderAmount`
 - Tính preview cho mỗi promo:
   - PERCENTAGE: discountAmount = totalAmount × (discountValue / 100), cap ở maxDiscountAmount
   - FIXED_AMOUNT: discountAmount = discountValue
-- Return: totalAmount + list PromoPreview (id, code, description, discountAmount, finalAmount)
+- Return: totalAmount + list PromoPreview (id, code, description, **applicationType**, discountAmount, finalAmount)
+- **Promo code của Organizer khác tạo cho event khác sẽ KHÔNG hiển thị**
 
-### **14.4. Admin: Deactivate Promo Code**
-- Update status = DISABLED
-
-### **14.5. Apply Promo in Booking**
+### **14.10. Apply Promo in Booking**
 - Gọi từ Booking Service (Step 9.1 - Step 4)
 - Promo được áp dụng ngay khi tạo booking (truyền `promoCodeId` trong CreateBookingRequest)
 - **Không còn API riêng `POST /api/bookings/apply-promo`**
 - `usedCount` chỉ tăng khi payment callback SUCCESS (trong PaymentService)
+
+### **14.11. Expire Promo Codes (Scheduled Job)**
+- Chạy hàng ngày lúc 00:00 (`@Scheduled(cron = "0 0 0 * * *")`)
+- Tìm promo codes: status = ACTIVE và `validTo < now`
+- Update status = EXPIRED
 
 ---
 

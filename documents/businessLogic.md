@@ -8,11 +8,27 @@
 - Validate email format và unique
 - Validate password strength (min 8 chars, có số, chữ hoa/thường)
 - Hash password với BCrypt
-- Tạo User với role mặc định = CUSTOMER, status = ACTIVE
-- Gửi email verification (optional)
+- Tạo User với role mặc định = CUSTOMER, status = **INACTIVE** (chờ xác nhận email)
+- Tạo OTP 6 số, lưu vào bảng `email_otps` (hết hạn sau 5 phút)
+- Gửi OTP qua email cho user
+- Return tokens + user info (status = INACTIVE)
+
+### **1.2. Email Verification (OTP) Logic**
+- User nhập email + OTP
+- Tìm OTP trong DB (`email_otps`) theo email + otp + used = false
+- Validate OTP chưa hết hạn (`expiresAt > now`)
+- Đánh dấu OTP đã dùng (`used = true`)
+- Cập nhật User.status = **ACTIVE**
 - Return success message
 
-### **1.2. Login Logic**
+### **1.3. Resend OTP Logic**
+- Validate email tồn tại trong hệ thống
+- Check user.status != ACTIVE (nếu đã active → reject)
+- Xóa OTP cũ của email
+- Tạo OTP mới 6 số, lưu DB (hết hạn 5 phút)
+- Gửi OTP mới qua email
+
+### **1.4. Login Logic**
 - Validate email/password
 - Check user status (ACTIVE/INACTIVE/BANNED)
 - Nếu BANNED → reject với message
@@ -22,18 +38,18 @@
 - Lưu Refresh Token vào DB (optional, để revoke)
 - Return tokens + user info
 
-### **1.3. Refresh Token Logic**
+### **1.5. Refresh Token Logic**
 - Validate Refresh Token
 - Check token expiration
 - Check token trong DB (nếu implement revoke)
 - Generate new Access Token
 - Return new Access Token
 
-### **1.4. Logout Logic**
+### **1.6. Logout Logic**
 - Invalidate Refresh Token (xóa khỏi DB hoặc blacklist)
 - Client xóa token ở local storage
 
-### **1.5. Password Reset Logic**
+### **1.7. Password Reset Logic**
 - User request reset (nhập email)
 - Generate reset token (exp: 15 phút)
 - Gửi email với reset link
@@ -41,7 +57,7 @@
 - Validate token, update password
 - Invalidate tất cả refresh tokens cũ
 
-### **1.6. Role-Based Access Control**
+### **1.8. Role-Based Access Control**
 - Middleware check JWT token
 - Extract role từ token
 - Check permission cho từng endpoint
@@ -243,8 +259,17 @@
 #### **Step 4: Create Booking**
 - Generate unique booking_code
 - Calculate total_amount = sum(ticket_price * quantity)
-- Set discount_amount = 0 (chưa có promo)
-- Set final_amount = total_amount
+- Nếu có `promoCodeId`:
+  - Validate promo code (status = ACTIVE, valid_from/valid_to, usageLimit vs usedCount, minOrderAmount)
+  - Calculate discount:
+    - PERCENTAGE: discount = total * (discount_value / 100)
+    - FIXED_AMOUNT: discount = discount_value
+    - Apply max_discount_amount nếu có
+  - Set discount_amount = calculated discount
+  - Create BookingPromoCode record (discountApplied = discount_amount)
+  - **Lưu ý:** Chưa tăng `usedCount` ở bước này (sẽ tăng khi payment SUCCESS)
+- Nếu không có promo: Set discount_amount = 0
+- Set final_amount = total_amount - discount_amount
 - Set status = PENDING
 - Set hold_expires_at = now + 15 phút
 
@@ -262,19 +287,13 @@
 - Return booking_id, booking_code, total_amount, hold_expires_at
 - Client chuyển sang payment
 
-### **9.2. Apply Promo Code**
-- User nhập promo code
-- Validate code exists, status = ACTIVE
-- Check valid_from, valid_to
-- Check usage_limit vs used_count
-- Check min_order_amount
-- Calculate discount:
-  - PERCENTAGE: discount = total * (discount_value / 100)
-  - FIXED_AMOUNT: discount = discount_value
-  - Apply max_discount_amount nếu có
-- Update booking: discount_amount, final_amount
-- Create BookingPromoCode record
-- Increment promo.used_count
+### **9.2. Get Available Promo Codes (Preview)**
+- User gửi danh sách items (ticketTypeId + quantity) và eventId
+- Hệ thống tính totalAmount từ items
+- Lọc promo codes: status = ACTIVE, còn hạn, chưa hết lượt dùng, đủ minOrderAmount
+- Cho mỗi promo, tính preview: discountAmount, finalAmount
+- Trả về danh sách promo khả dụng kèm số tiền giảm dự kiến
+- **Endpoint:** `POST /api/promo-codes/available` (chỉ cần đăng nhập, không cần ADMIN)
 
 ### **9.3. Cancel Booking (User)**
 - Check booking belongs to user
@@ -338,6 +357,9 @@
   - Update Payment: status = SUCCESS, paid_at = now
   - Update Booking: status = CONFIRMED
   - Generate tickets
+  - **Tăng `usedCount` của promo code** (nếu booking có BookingPromoCode)
+    - Query BookingPromoCode theo booking_id
+    - Với mỗi promo đã áp dụng: promo.usedCount += 1
   - Send notification
 - If FAILED:
   - Update Payment: status = FAILED
@@ -499,11 +521,25 @@
 - Check used_count < usage_limit
 - Check booking amount >= min_order_amount
 
-### **14.3. Apply Promo Code**
-- (Gọi từ Booking Service step 9.2)
+### **14.3. Get Available Promo Codes**
+- **Endpoint:** `POST /api/promo-codes/available`
+- **Permission:** Bất kỳ user đã đăng nhập (không cần ADMIN)
+- Input: eventId + list items (ticketTypeId, quantity)
+- Tính totalAmount từ items (quantity × ticketType.price)
+- Lọc promos: status = ACTIVE, còn hạn valid_from/valid_to, usedCount < usageLimit, totalAmount >= minOrderAmount
+- Tính preview cho mỗi promo:
+  - PERCENTAGE: discountAmount = totalAmount × (discountValue / 100), cap ở maxDiscountAmount
+  - FIXED_AMOUNT: discountAmount = discountValue
+- Return: totalAmount + list PromoPreview (id, code, description, discountAmount, finalAmount)
 
 ### **14.4. Admin: Deactivate Promo Code**
 - Update status = DISABLED
+
+### **14.5. Apply Promo in Booking**
+- Gọi từ Booking Service (Step 9.1 - Step 4)
+- Promo được áp dụng ngay khi tạo booking (truyền `promoCodeId` trong CreateBookingRequest)
+- **Không còn API riêng `POST /api/bookings/apply-promo`**
+- `usedCount` chỉ tăng khi payment callback SUCCESS (trong PaymentService)
 
 ---
 
@@ -648,7 +684,7 @@
 
 ## 🕒 **20. SCHEDULED JOBS (Background Tasks)**
 
-### **20.1. Expire Pending Bookings**
+### **20.1. Expire Pending Bookings** ✅ Đã implement
 - Run every 1 minute
 - Find bookings: status=PENDING AND hold_expires_at < now
 - Auto-cancel và release inventory
@@ -663,18 +699,21 @@
 - Find events starting tomorrow
 - Send reminder emails/SMS to ticket holders
 
-### **20.4. Event Status Update**
-- Run every hour
-- Update event status:
-  - PUBLISHED → ONGOING (nếu start_time reached)
-  - ONGOING → COMPLETED (nếu end_time passed)
+### **20.4. Event Status Update** ✅ Đã implement
+- Run every hour (`@Scheduled(cron = "0 0 * * * *")`)
+- Update EventSchedule status:
+  - SCHEDULED → ONGOING (nếu startTime đã qua)
+  - ONGOING → COMPLETED (nếu endTime đã qua)
+- Update Event status:
+  - PUBLISHED → ONGOING (nếu bất kỳ schedule nào ONGOING)
+  - ONGOING → COMPLETED (nếu tất cả schedules đã COMPLETED hoặc CANCELLED và không còn schedule SCHEDULED/ONGOING)
 
-### **20.5. Promo Code Expiration**
-- Run daily
+### **20.5. Promo Code Expiration** ✅ Đã implement
+- Run daily at midnight (`@Scheduled(cron = "0 0 0 * * *")`)
 - Update promo codes: status=ACTIVE → EXPIRED (nếu valid_to passed)
 
-### **20.6. Ticket Listing Expiration**
-- Run every hour
+### **20.6. Ticket Listing Expiration** ✅ Đã implement
+- Run every hour (`@Scheduled(cron = "0 0 * * * *")`)
 - Update listings: status=FOR_SALE → EXPIRED (nếu expires_at passed)
 
 ---

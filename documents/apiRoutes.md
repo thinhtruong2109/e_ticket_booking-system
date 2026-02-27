@@ -36,7 +36,7 @@
 | | |
 |---|---|
 | **URL** | `POST /api/auth/register` |
-| **Mô tả** | Tạo tài khoản mới cho người dùng |
+| **Mô tả** | Tạo tài khoản mới cho người dùng. User sẽ ở trạng thái `INACTIVE` và nhận OTP qua email để xác thực |
 | **Authorization** | ❌ Không cần |
 | **Header** | `Content-Type: application/json` |
 
@@ -50,11 +50,74 @@
 }
 ```
 
-**Response:** `AuthResponse` (accessToken, refreshToken, user info)
+**Response:** `AuthResponse` (accessToken, refreshToken, user info với status = INACTIVE)
+
+> ⚠️ Sau khi đăng ký, hệ thống gửi OTP 6 số qua email. User cần gọi `POST /api/auth/verify-email` để xác nhận.
 
 ---
 
-### 1.2. Đăng nhập
+### 1.2. Xác nhận email (OTP)
+
+| | |
+|---|---|
+| **URL** | `POST /api/auth/verify-email` |
+| **Mô tả** | Xác nhận email bằng mã OTP nhận qua email. Chuyển user sang trạng thái `ACTIVE` |
+| **Authorization** | ❌ Không cần |
+| **Header** | `Content-Type: application/json` |
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",   // ✅ Bắt buộc
+  "otp": "123456"                // ✅ Bắt buộc, mã OTP 6 số
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Xác nhận email thành công"
+}
+```
+
+**Lỗi có thể xảy ra:**
+- OTP không hợp lệ hoặc đã hết hạn (400)
+- Email không tồn tại (400)
+
+---
+
+### 1.3. Gửi lại OTP
+
+| | |
+|---|---|
+| **URL** | `POST /api/auth/resend-otp` |
+| **Mô tả** | Gửi lại mã OTP xác thực email. Chỉ dùng cho user chưa verify (status = INACTIVE) |
+| **Authorization** | ❌ Không cần |
+| **Header** | `Content-Type: application/json` |
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com"    // ✅ Bắt buộc
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Đã gửi lại OTP"
+}
+```
+
+**Lỗi có thể xảy ra:**
+- Email không tồn tại (400)
+- Email đã được xác nhận (400)
+
+---
+
+### 1.4. Đăng nhập
 
 | | |
 |---|---|
@@ -75,7 +138,7 @@
 
 ---
 
-### 1.3. Làm mới token
+### 1.5. Làm mới token
 
 | | |
 |---|---|
@@ -95,7 +158,7 @@
 
 ---
 
-### 1.4. Đăng xuất
+### 1.6. Đăng xuất
 
 | | |
 |---|---|
@@ -595,32 +658,16 @@
       "quantity": 1
     }
   ],
-  "seatIds": [10, 11, 12]             // ❌ Không bắt buộc (dùng cho event có seat map)
+  "seatIds": [10, 11, 12],            // ❌ Không bắt buộc (dùng cho event có seat map)
+  "promoCodeId": 1                     // ❌ Không bắt buộc (ID promo code, áp dụng khi tạo booking)
 }
 ```
 
----
-
-### 7.2. Áp dụng mã giảm giá
-
-| | |
-|---|---|
-| **URL** | `POST /api/bookings/apply-promo` |
-| **Mô tả** | Áp mã khuyến mãi vào booking |
-| **Authorization** | ✅ `Bearer <token>` |
-| **Header** | `Authorization: Bearer <token>`, `Content-Type: application/json` |
-
-**Request Body:**
-```json
-{
-  "bookingId": 1,                  // ✅ Bắt buộc
-  "promoCode": "SALE2026"          // ✅ Bắt buộc
-}
-```
+> **Lưu ý:** Nếu có `promoCodeId`, hệ thống sẽ validate promo code (status ACTIVE, thời hạn, usage limit, min order amount), tính discount và tạo `BookingPromoCode` record. `usedCount` của promo code chỉ được tăng khi thanh toán thành công (payment callback SUCCESS).
 
 ---
 
-### 7.3. Hủy booking
+### 7.2. Hủy booking
 
 | | |
 |---|---|
@@ -632,7 +679,7 @@
 
 ---
 
-### 7.4. Lấy danh sách booking của tôi
+### 7.3. Lấy danh sách booking của tôi
 
 | | |
 |---|---|
@@ -643,7 +690,7 @@
 
 ---
 
-### 7.5. Xem chi tiết booking
+### 7.4. Xem chi tiết booking
 
 | | |
 |---|---|
@@ -681,7 +728,7 @@
 | | |
 |---|---|
 | **URL** | `POST /api/payments/callback` |
-| **Mô tả** | Callback từ cổng thanh toán, xác nhận thành công hoặc thất bại. Khi thành công sẽ tự confirm booking và sinh ticket. |
+| **Mô tả** | Callback từ cổng thanh toán, xác nhận thành công hoặc thất bại. Khi thành công sẽ tự confirm booking, sinh ticket, và tăng `usedCount` của promo code (nếu có). |
 | **Authorization** | ❌ Không cần (gọi từ payment gateway) |
 | **Query Params** | `transactionId` (String) ✅ Bắt buộc |
 | | `success` (boolean) ✅ Bắt buộc — `true` hoặc `false` |
@@ -930,7 +977,7 @@
 
 ## 12. Promo Codes
 
-> ⚠️ **Tất cả API trong nhóm này đều yêu cầu role `ADMIN`**
+> ⚠️ **Các API quản lý (CRUD) yêu cầu role `ADMIN`. API xem promo khả dụng (`POST /available`) chỉ cần đăng nhập.**
 
 ### 12.1. Tạo mã giảm giá
 
@@ -1006,6 +1053,49 @@
 | **Role** | 🔒 `ADMIN` |
 | **Path Variable** | `id` — Promo Code ID |
 | **Request Body** | Không có |
+
+---
+
+### 12.6. Xem promo codes khả dụng cho đơn hàng
+
+| | |
+|---|---|
+| **URL** | `POST /api/promo-codes/available` |
+| **Mô tả** | Lấy danh sách promo code có thể áp dụng cho đơn hàng, kèm preview số tiền giảm |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔓 Bất kỳ user đã đăng nhập (không yêu cầu ADMIN) |
+| **Header** | `Authorization: Bearer <token>`, `Content-Type: application/json` |
+
+**Request Body:**
+```json
+{
+  "eventId": 1,                        // ✅ Bắt buộc
+  "items": [                           // ✅ Bắt buộc, ít nhất 1 item
+    {
+      "ticketTypeId": 1,               // ✅ Bắt buộc
+      "quantity": 2                    // ✅ Bắt buộc, số dương
+    }
+  ]
+}
+```
+
+**Response:** `AvailablePromoResponse`
+```json
+{
+  "totalAmount": 1000000,
+  "availablePromoCodes": [
+    {
+      "id": 1,
+      "code": "SALE2026",
+      "description": "Giảm giá Tết 2026",
+      "discountAmount": 200000,
+      "finalAmount": 800000
+    }
+  ]
+}
+```
+
+> **Logic:** Hệ thống tính `totalAmount` từ items (quantity × price), lọc promos ACTIVE còn hạn, chưa hết lượt dùng, đủ `minOrderAmount`, rồi tính preview `discountAmount` và `finalAmount` cho mỗi promo.
 
 ---
 
@@ -1163,32 +1253,32 @@
 | 33 | GET | `/api/ticket-types/{id}` | ❌ | — |
 | 34 | POST | `/api/ticket-types` | ✅ | ORGANIZER/ADMIN |
 | 35 | POST | `/api/bookings` | ✅ | Any |
-| 36 | POST | `/api/bookings/apply-promo` | ✅ | Any |
-| 37 | DELETE | `/api/bookings/{id}` | ✅ | Any |
-| 38 | GET | `/api/bookings/my-bookings` | ✅ | Any |
-| 39 | GET | `/api/bookings/{id}` | ✅ | Any |
-| 40 | POST | `/api/payments` | ✅ | Any |
-| 41 | POST | `/api/payments/callback?transactionId=&success=` | ❌ | — |
-| 42 | GET | `/api/payments/booking/{bookingId}` | ✅ | Any |
-| 43 | GET | `/api/tickets/my-tickets` | ✅ | Any |
-| 44 | GET | `/api/tickets/booking/{bookingId}` | ✅ | Any |
-| 45 | GET | `/api/tickets/code/{ticketCode}` | ✅ | Any |
-| 46 | POST | `/api/tickets/check-in` | ✅ | STAFF/ORGANIZER/ADMIN |
-| 47 | GET | `/api/venues` | ❌ | — |
-| 48 | GET | `/api/venues/{id}` | ❌ | — |
-| 49 | GET | `/api/venues/search?city=` | ❌ | — |
-| 50 | POST | `/api/venues` | ✅ | ORGANIZER/ADMIN |
-| 51 | PUT | `/api/venues/{id}` | ✅ | ORGANIZER/ADMIN |
-| 52 | POST | `/api/seats/sections` | ✅ | ORGANIZER/ADMIN |
-| 53 | GET | `/api/seats/sections/venue/{venueId}` | ✅ | Any |
-| 54 | POST | `/api/seats` | ✅ | ORGANIZER/ADMIN |
-| 55 | GET | `/api/seats/venue/{venueId}` | ✅ | Any |
-| 56 | GET | `/api/seats/available?scheduleId=` | ✅ | Any |
-| 57 | POST | `/api/promo-codes` | ✅ | ADMIN |
-| 58 | GET | `/api/promo-codes` | ✅ | ADMIN |
-| 59 | GET | `/api/promo-codes/active` | ✅ | ADMIN |
-| 60 | GET | `/api/promo-codes/{id}` | ✅ | ADMIN |
-| 61 | PUT | `/api/promo-codes/{id}/deactivate` | ✅ | ADMIN |
+| 36 | DELETE | `/api/bookings/{id}` | ✅ | Any |
+| 37 | GET | `/api/bookings/my-bookings` | ✅ | Any |
+| 38 | GET | `/api/bookings/{id}` | ✅ | Any |
+| 39 | POST | `/api/payments` | ✅ | Any |
+| 40 | POST | `/api/payments/callback?transactionId=&success=` | ❌ | — |
+| 41 | GET | `/api/payments/booking/{bookingId}` | ✅ | Any |
+| 42 | GET | `/api/tickets/my-tickets` | ✅ | Any |
+| 43 | GET | `/api/tickets/booking/{bookingId}` | ✅ | Any |
+| 44 | GET | `/api/tickets/code/{ticketCode}` | ✅ | Any |
+| 45 | POST | `/api/tickets/check-in` | ✅ | STAFF/ORGANIZER/ADMIN |
+| 46 | GET | `/api/venues` | ❌ | — |
+| 47 | GET | `/api/venues/{id}` | ❌ | — |
+| 48 | GET | `/api/venues/search?city=` | ❌ | — |
+| 49 | POST | `/api/venues` | ✅ | ORGANIZER/ADMIN |
+| 50 | PUT | `/api/venues/{id}` | ✅ | ORGANIZER/ADMIN |
+| 51 | POST | `/api/seats/sections` | ✅ | ORGANIZER/ADMIN |
+| 52 | GET | `/api/seats/sections/venue/{venueId}` | ✅ | Any |
+| 53 | POST | `/api/seats` | ✅ | ORGANIZER/ADMIN |
+| 54 | GET | `/api/seats/venue/{venueId}` | ✅ | Any |
+| 55 | GET | `/api/seats/available?scheduleId=` | ✅ | Any |
+| 56 | POST | `/api/promo-codes` | ✅ | ADMIN |
+| 57 | GET | `/api/promo-codes` | ✅ | ADMIN |
+| 58 | GET | `/api/promo-codes/active` | ✅ | ADMIN |
+| 59 | GET | `/api/promo-codes/{id}` | ✅ | ADMIN |
+| 60 | PUT | `/api/promo-codes/{id}/deactivate` | ✅ | ADMIN |
+| 61 | POST | `/api/promo-codes/available` | ✅ | Any (đã đăng nhập) |
 | 62 | GET | `/api/ticket-listings` | ❌ | — |
 | 63 | GET | `/api/ticket-listings/{id}` | ❌ | — |
 | 64 | GET | `/api/ticket-listings/my-listings` | ✅ | Any |

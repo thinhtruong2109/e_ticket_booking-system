@@ -1,0 +1,1531 @@
+{
+	"info": {
+		"_postman_id": "e-ticket-booking-system-collection",
+		"name": "E-Ticket Booking System",
+		"description": "Complete API collection for E-Ticket Booking System.\n\nAll responses are wrapped in ApiResponse<T>:\n{\n  \"success\": boolean,\n  \"message\": \"string\",\n  \"data\": T\n}\n\n**Authentication:** Most endpoints require a Bearer token. After login/register, copy the accessToken and set it in the collection variable `accessToken`.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"description": "Authentication endpoints: register, login, refresh token, logout",
+			"item": [
+				{
+					"name": "Register",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data) {",
+									"    pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+									"    pm.collectionVariables.set('refreshToken', jsonData.data.refreshToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"Password123\",\n    \"fullName\": \"John Doe\",\n    \"phoneNumber\": \"0123456789\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "register"]
+						},
+						"description": "Register a new user account. Returns access token and refresh token."
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data) {",
+									"    pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+									"    pm.collectionVariables.set('refreshToken', jsonData.data.refreshToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"Password123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "login"]
+						},
+						"description": "Login with email and password. Returns access token and refresh token."
+					},
+					"response": []
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.success && jsonData.data) {",
+									"    pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/refresh-token",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "refresh-token"]
+						},
+						"description": "Refresh the access token using a valid refresh token."
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "logout"]
+						},
+						"description": "Logout the current user."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"description": "User management endpoints",
+			"item": [
+				{
+					"name": "Get My Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "me"]
+						},
+						"description": "Get the current authenticated user's profile."
+					},
+					"response": []
+				},
+				{
+					"name": "Update My Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"fullName\": \"John Updated\",\n    \"phoneNumber\": \"0987654321\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "me"]
+						},
+						"description": "Update the current user's profile information."
+					},
+					"response": []
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"currentPassword\": \"Password123\",\n    \"newPassword\": \"NewPassword456\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/users/me/password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "me", "password"]
+						},
+						"description": "Change the current user's password."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users"]
+						},
+						"description": "Get all users. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get Users By Role",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/role/CUSTOMER",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "role", "CUSTOMER"]
+						},
+						"description": "Get users by role (CUSTOMER, ORGANIZER, ADMIN, STAFF). Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Ban User",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/1/ban",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "1", "ban"]
+						},
+						"description": "Ban a user by ID. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Unban User",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/1/unban",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "1", "unban"]
+						},
+						"description": "Unban a user by ID. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Change User Role",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/users/1/role?role=ORGANIZER",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "users", "1", "role"],
+							"query": [
+								{
+									"key": "role",
+									"value": "ORGANIZER",
+									"description": "New role: CUSTOMER, ORGANIZER, ADMIN, STAFF"
+								}
+							]
+						},
+						"description": "Change a user's role. Requires ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Event Categories",
+			"description": "Event category management endpoints",
+			"item": [
+				{
+					"name": "Get All Categories",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/event-categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-categories"]
+						},
+						"description": "Get all event categories. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Category By ID",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/event-categories/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-categories", "1"]
+						},
+						"description": "Get an event category by ID. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Create Category",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Music Concert\",\n    \"description\": \"Live music performances and concerts\",\n    \"iconUrl\": \"https://example.com/icons/music.png\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/event-categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-categories"]
+						},
+						"description": "Create a new event category. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Update Category",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Music Concert Updated\",\n    \"description\": \"Updated description\",\n    \"iconUrl\": \"https://example.com/icons/music-updated.png\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/event-categories/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-categories", "1"]
+						},
+						"description": "Update an event category. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Delete Category",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/event-categories/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-categories", "1"]
+						},
+						"description": "Delete an event category. Requires ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Events",
+			"description": "Event management endpoints",
+			"item": [
+				{
+					"name": "Get All Events (Public)",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/events",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events"]
+						},
+						"description": "Get all published events. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Events By Category",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/events?categoryId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events"],
+							"query": [
+								{
+									"key": "categoryId",
+									"value": "1",
+									"description": "Filter by category ID"
+								}
+							]
+						},
+						"description": "Get events filtered by category. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Events By Name",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/events?name=concert",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events"],
+							"query": [
+								{
+									"key": "name",
+									"value": "concert",
+									"description": "Search by event name"
+								}
+							]
+						},
+						"description": "Search events by name. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Event By ID",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/events/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events", "1"]
+						},
+						"description": "Get event details by ID. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Create Event",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Summer Music Festival 2026\",\n    \"description\": \"A grand summer music festival featuring top artists\",\n    \"categoryId\": 1,\n    \"venueId\": 1,\n    \"bannerImageUrl\": \"https://example.com/banner.jpg\",\n    \"thumbnailImageUrl\": \"https://example.com/thumbnail.jpg\",\n    \"totalTickets\": 5000,\n    \"allowTicketExchange\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/events",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events"]
+						},
+						"description": "Create a new event. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Update Event",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Summer Music Festival 2026 - Updated\",\n    \"description\": \"Updated description\",\n    \"categoryId\": 1,\n    \"bannerImageUrl\": \"https://example.com/banner-new.jpg\",\n    \"thumbnailImageUrl\": \"https://example.com/thumbnail-new.jpg\",\n    \"allowTicketExchange\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/events/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events", "1"]
+						},
+						"description": "Update an event. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Publish Event",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/events/1/publish",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events", "1", "publish"]
+						},
+						"description": "Publish an event (change status to PUBLISHED). Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Cancel Event",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/events/1/cancel",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events", "1", "cancel"]
+						},
+						"description": "Cancel an event. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Get My Events",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/events/my-events",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events", "my-events"]
+						},
+						"description": "Get events created by the current organizer. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get All Events (Including Unpublished)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/events/all",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "events", "all"]
+						},
+						"description": "Get all events including unpublished ones. Requires ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Event Schedules",
+			"description": "Event schedule management endpoints",
+			"item": [
+				{
+					"name": "Get Schedules By Event",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/event-schedules?eventId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-schedules"],
+							"query": [
+								{
+									"key": "eventId",
+									"value": "1",
+									"description": "Event ID to get schedules for"
+								}
+							]
+						},
+						"description": "Get all schedules for an event. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Available Schedules",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/event-schedules/available?eventId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-schedules", "available"],
+							"query": [
+								{
+									"key": "eventId",
+									"value": "1",
+									"description": "Event ID to get available schedules for"
+								}
+							]
+						},
+						"description": "Get available (not cancelled/past) schedules for an event. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Schedule By ID",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/event-schedules/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-schedules", "1"]
+						},
+						"description": "Get schedule details by ID. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Create Schedule",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"eventId\": 1,\n    \"startTime\": \"2026-07-15T19:00:00\",\n    \"endTime\": \"2026-07-15T23:00:00\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/event-schedules",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-schedules"]
+						},
+						"description": "Create a new schedule for an event. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Cancel Schedule",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/event-schedules/1/cancel",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "event-schedules", "1", "cancel"]
+						},
+						"description": "Cancel an event schedule. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Venues",
+			"description": "Venue management endpoints",
+			"item": [
+				{
+					"name": "Get All Venues",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/venues",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "venues"]
+						},
+						"description": "Get all venues. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Venue By ID",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/venues/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "venues", "1"]
+						},
+						"description": "Get venue details by ID. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Venues By City",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/venues/search?city=Hanoi",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "venues", "search"],
+							"query": [
+								{
+									"key": "city",
+									"value": "Hanoi",
+									"description": "City name to search venues"
+								}
+							]
+						},
+						"description": "Search venues by city name. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Create Venue",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"National Convention Center\",\n    \"address\": \"57 Pham Hung, Me Tri, Nam Tu Liem\",\n    \"city\": \"Hanoi\",\n    \"country\": \"Vietnam\",\n    \"totalCapacity\": 10000,\n    \"hasSeatMap\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/venues",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "venues"]
+						},
+						"description": "Create a new venue. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Update Venue",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"National Convention Center - Updated\",\n    \"address\": \"57 Pham Hung, Me Tri, Nam Tu Liem\",\n    \"city\": \"Hanoi\",\n    \"country\": \"Vietnam\",\n    \"totalCapacity\": 12000,\n    \"hasSeatMap\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/venues/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "venues", "1"]
+						},
+						"description": "Update a venue. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Seats & Sections",
+			"description": "Seat and section management endpoints",
+			"item": [
+				{
+					"name": "[Organizer/Admin] Create Section",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"venueId\": 1,\n    \"name\": \"VIP Section A\",\n    \"description\": \"Front row VIP section\",\n    \"capacity\": 200,\n    \"hasNumberedSeats\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/seats/sections",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "seats", "sections"]
+						},
+						"description": "Create a new section in a venue. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Sections By Venue",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/seats/sections/venue/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "seats", "sections", "venue", "1"]
+						},
+						"description": "Get all sections for a venue. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Create Seat",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"venueId\": 1,\n    \"sectionId\": 1,\n    \"rowNumber\": \"A\",\n    \"seatNumber\": \"1\",\n    \"seatType\": \"VIP\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/seats",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "seats"]
+						},
+						"description": "Create a new seat in a venue. Requires ORGANIZER or ADMIN role. Seat types: VIP, REGULAR, WHEELCHAIR."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Seats By Venue",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/seats/venue/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "seats", "venue", "1"]
+						},
+						"description": "Get all seats for a venue. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Available Seats By Schedule",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/seats/available?scheduleId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "seats", "available"],
+							"query": [
+								{
+									"key": "scheduleId",
+									"value": "1",
+									"description": "Schedule ID to check available seats"
+								}
+							]
+						},
+						"description": "Get available seats for a specific schedule. Public endpoint."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Ticket Types",
+			"description": "Ticket type management endpoints",
+			"item": [
+				{
+					"name": "Get Ticket Types By Event",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-types?eventId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-types"],
+							"query": [
+								{
+									"key": "eventId",
+									"value": "1",
+									"description": "Event ID to get ticket types for"
+								}
+							]
+						},
+						"description": "Get all ticket types for an event. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Available Ticket Types",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-types/available?eventId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-types", "available"],
+							"query": [
+								{
+									"key": "eventId",
+									"value": "1",
+									"description": "Event ID to get available ticket types for"
+								}
+							]
+						},
+						"description": "Get ticket types with available quantity > 0. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket Type By ID",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-types/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-types", "1"]
+						},
+						"description": "Get ticket type details by ID. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer/Admin] Create Ticket Type",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"eventId\": 1,\n    \"name\": \"VIP Ticket\",\n    \"description\": \"VIP access with front row seats\",\n    \"price\": 500000,\n    \"totalQuantity\": 100,\n    \"maxPerBooking\": 5\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-types",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-types"]
+						},
+						"description": "Create a new ticket type for an event. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Bookings",
+			"description": "Booking management endpoints",
+			"item": [
+				{
+					"name": "Create Booking",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"eventId\": 1,\n    \"scheduleId\": 1,\n    \"items\": [\n        {\n            \"ticketTypeId\": 1,\n            \"quantity\": 2\n        }\n    ],\n    \"seatIds\": [1, 2]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bookings"]
+						},
+						"description": "Create a new booking. Requires authentication. seatIds is optional (for seat map events only)."
+					},
+					"response": []
+				},
+				{
+					"name": "Apply Promo Code",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": 1,\n    \"promoCode\": \"SUMMER2026\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings/apply-promo",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bookings", "apply-promo"]
+						},
+						"description": "Apply a promo code to a booking. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Booking",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bookings", "1"]
+						},
+						"description": "Cancel a booking by ID. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Bookings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings/my-bookings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bookings", "my-bookings"]
+						},
+						"description": "Get all bookings for the current user. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Booking By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/bookings/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "bookings", "1"]
+						},
+						"description": "Get booking details by ID. Requires authentication."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Payments",
+			"description": "Payment processing endpoints",
+			"item": [
+				{
+					"name": "Create Payment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": 1,\n    \"paymentMethod\": \"VNPAY\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments"]
+						},
+						"description": "Create a payment for a booking. Payment methods: VNPAY, MOMO, STRIPE. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Payment Callback",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/callback?transactionId=TXN123456&success=true",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "callback"],
+							"query": [
+								{
+									"key": "transactionId",
+									"value": "TXN123456",
+									"description": "Transaction ID from payment provider"
+								},
+								{
+									"key": "success",
+									"value": "true",
+									"description": "Whether the payment was successful"
+								}
+							]
+						},
+						"description": "Payment callback from payment provider. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Payment By Booking",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/booking/1?bookingId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "booking", "1"],
+							"query": [
+								{
+									"key": "bookingId",
+									"value": "1",
+									"description": "Booking ID"
+								}
+							]
+						},
+						"description": "Get payment details for a booking. Requires authentication."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Tickets",
+			"description": "Ticket management and check-in endpoints",
+			"item": [
+				{
+					"name": "Get My Tickets",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/my-tickets",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tickets", "my-tickets"]
+						},
+						"description": "Get all tickets for the current user. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Tickets By Booking",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/booking/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tickets", "booking", "1"]
+						},
+						"description": "Get all tickets for a booking. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket By Code",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/code/TICKET-ABC123",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tickets", "code", "TICKET-ABC123"]
+						},
+						"description": "Get ticket details by ticket code. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "[Staff/Admin/Organizer] Check In Ticket",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"ticketCode\": \"TICKET-ABC123\",\n    \"scheduleId\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/check-in",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tickets", "check-in"]
+						},
+						"description": "Check in a ticket at the event. Requires STAFF, ADMIN, or ORGANIZER role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Promo Codes",
+			"description": "Promo code management endpoints (Admin only)",
+			"item": [
+				{
+					"name": "[Admin] Create Promo Code",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"SUMMER2026\",\n    \"description\": \"Summer discount 20%\",\n    \"discountType\": \"PERCENTAGE\",\n    \"discountValue\": 20,\n    \"minOrderAmount\": 100000,\n    \"maxDiscountAmount\": 500000,\n    \"usageLimit\": 1000,\n    \"validFrom\": \"2026-06-01T00:00:00\",\n    \"validTo\": \"2026-08-31T23:59:59\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes"]
+						},
+						"description": "Create a new promo code. Discount types: PERCENTAGE, FIXED_AMOUNT. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get All Promo Codes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes"]
+						},
+						"description": "Get all promo codes. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get Active Promo Codes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/active",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "active"]
+						},
+						"description": "Get all active promo codes. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get Promo Code By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "1"]
+						},
+						"description": "Get promo code details by ID. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Deactivate Promo Code",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/1/deactivate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "1", "deactivate"]
+						},
+						"description": "Deactivate a promo code. Requires ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Ticket Listings & Exchanges",
+			"description": "Ticket marketplace - listing and exchange endpoints",
+			"item": [
+				{
+					"name": "Get All Listings",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings"]
+						},
+						"description": "Get all active ticket listings. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Listing By ID",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings", "1"]
+						},
+						"description": "Get ticket listing details by ID. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Listings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings/my-listings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings", "my-listings"]
+						},
+						"description": "Get listings created by the current user. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Ticket Listing",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"ticketId\": 1,\n    \"listingPrice\": 600000,\n    \"exchangeType\": \"SELL\",\n    \"description\": \"Cannot attend, selling at original price\",\n    \"expiresAt\": \"2026-07-14T23:59:59\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings"]
+						},
+						"description": "Create a ticket listing. Exchange types: SELL, TRADE, BOTH. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Listing",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings", "1"]
+						},
+						"description": "Cancel a ticket listing. Requires authentication (must be the listing owner)."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Ticket Exchange",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"ticketListingId\": 1,\n    \"transactionType\": \"PURCHASE\",\n    \"paymentMethod\": \"VNPAY\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings/exchanges",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings", "exchanges"]
+						},
+						"description": "Initiate a ticket exchange/purchase. Transaction types: PURCHASE, TRADE. For TRADE, include tradeTicketId. Payment methods: VNPAY, MOMO, STRIPE. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Ticket Exchange (Trade)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"ticketListingId\": 1,\n    \"transactionType\": \"TRADE\",\n    \"tradeTicketId\": 5\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings/exchanges",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings", "exchanges"]
+						},
+						"description": "Initiate a ticket trade. Provide your ticket ID to trade with the listing. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Complete Exchange",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings/exchanges/1/complete",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings", "exchanges", "1", "complete"]
+						},
+						"description": "Complete a ticket exchange. Requires authentication (must be the seller)."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Exchange",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/ticket-listings/exchanges/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "ticket-listings", "exchanges", "1"]
+						},
+						"description": "Cancel a ticket exchange. Requires authentication."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

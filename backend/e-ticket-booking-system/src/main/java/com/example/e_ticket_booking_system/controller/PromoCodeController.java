@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.e_ticket_booking_system.dto.request.AvailablePromoRequest;
 import com.example.e_ticket_booking_system.dto.request.CreatePromoCodeRequest;
 import com.example.e_ticket_booking_system.dto.response.ApiResponse;
+import com.example.e_ticket_booking_system.dto.response.AvailablePromoResponse;
 import com.example.e_ticket_booking_system.dto.response.PromoCodeResponse;
 import com.example.e_ticket_booking_system.service.PromoCodeService;
 
@@ -54,5 +56,17 @@ public class PromoCodeController {
     public ResponseEntity<ApiResponse<PromoCodeResponse>> deactivatePromoCode(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Promo code deactivated",
                 promoCodeService.deactivatePromoCode(id)));
+    }
+
+    /**
+     * Get available promo codes for a given order.
+     * Authenticated users can call this (not Admin-only).
+     */
+    @PostMapping("/available")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<AvailablePromoResponse>> getAvailablePromoCodes(
+            @Valid @RequestBody AvailablePromoRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                promoCodeService.getAvailablePromoCodes(request)));
     }
 }

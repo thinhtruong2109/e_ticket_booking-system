@@ -12,12 +12,16 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.e_ticket_booking_system.dto.request.CreatePaymentRequest;
 import com.example.e_ticket_booking_system.dto.response.PaymentResponse;
 import com.example.e_ticket_booking_system.entity.Booking;
+import com.example.e_ticket_booking_system.entity.BookingPromoCode;
 import com.example.e_ticket_booking_system.entity.Payment;
+import com.example.e_ticket_booking_system.entity.PromoCode;
 import com.example.e_ticket_booking_system.exception.BadRequestException;
 import com.example.e_ticket_booking_system.exception.ForbiddenException;
 import com.example.e_ticket_booking_system.exception.ResourceNotFoundException;
+import com.example.e_ticket_booking_system.repository.BookingPromoCodeRepository;
 import com.example.e_ticket_booking_system.repository.BookingRepository;
 import com.example.e_ticket_booking_system.repository.PaymentRepository;
+import com.example.e_ticket_booking_system.repository.PromocodeRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,6 +33,8 @@ public class PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
+    private final BookingPromoCodeRepository bookingPromoCodeRepository;
+    private final PromocodeRepository promoCodeRepository;
     private final BookingService bookingService;
     private final TicketService ticketService;
 
@@ -84,6 +90,17 @@ public class PaymentService {
             // Confirm booking and generate tickets
             bookingService.confirmBooking(payment.getBooking().getId());
             ticketService.generateTickets(payment.getBooking().getId());
+
+            // Increment promo code usedCount if a promo was applied
+            java.util.List<BookingPromoCode> bpcList = bookingPromoCodeRepository
+                    .findByBookingId(payment.getBooking().getId());
+            for (BookingPromoCode bpc : bpcList) {
+                PromoCode promo = bpc.getPromoCode();
+                promo.setUsedCount(promo.getUsedCount() + 1);
+                promoCodeRepository.save(promo);
+                log.info("Promo code {} usedCount incremented for booking {}",
+                        promo.getCode(), payment.getBooking().getBookingCode());
+            }
 
             log.info("Payment successful: {}", transactionId);
         } else {

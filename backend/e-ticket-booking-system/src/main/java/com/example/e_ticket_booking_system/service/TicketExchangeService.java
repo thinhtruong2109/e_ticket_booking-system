@@ -319,6 +319,26 @@ public class TicketExchangeService {
                 listing.getListedAt(), listing.getExpiresAt());
     }
 
+    /**
+     * Scheduled task: Expire ticket listings whose expiresAt has passed.
+     * FOR_SALE → EXPIRED
+     */
+    @Transactional
+    public void expireListings() {
+        List<TicketListing> expiredListings = listingRepository
+                .findByStatusAndExpiresAtBefore("FOR_SALE", LocalDateTime.now());
+
+        for (TicketListing listing : expiredListings) {
+            listing.setStatus("EXPIRED");
+            listingRepository.save(listing);
+            log.info("Ticket listing expired: id={}", listing.getId());
+        }
+
+        if (!expiredListings.isEmpty()) {
+            log.info("Total ticket listings expired: {}", expiredListings.size());
+        }
+    }
+
     private TicketExchangeResponse toExchangeResponse(TicketExchange exchange) {
         // Lấy tradeTicketId nếu có
         Long tradeTicketId = null;

@@ -13,4 +13,7 @@ public interface EventScheduleRepository extends JpaRepository<EventSchedule, Lo
     List<EventSchedule> findByEventId(Long eventId);
     List<EventSchedule> findByStatus(String status);
     List<EventSchedule> findByStartTimeGreaterThan(LocalDateTime startTime);
+    List<EventSchedule> findByEventIdAndStatus(Long eventId, String status);
+    List<EventSchedule> findByStatusAndStartTimeBefore(String status, LocalDateTime time);
+    List<EventSchedule> findByStatusAndEndTimeBefore(String status, LocalDateTime time);
 }

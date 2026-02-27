@@ -1,5 +1,6 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -29,8 +30,6 @@ import com.example.e_ticket_booking_system.repository.TicketTransferLogRepositor
 import com.example.e_ticket_booking_system.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -192,7 +191,7 @@ public class TicketExchangeService {
             if (request.getTradeTicketId() == null) {
                 throw new BadRequestException("Trade ticket ID is required for trade transactions");
             }
-            Ticket tradeTicket = null;
+            Ticket tradeTicket;
             Optional<Ticket> optionalTradeTicket = ticketRepository.findById(request.getTradeTicketId());
             if (!optionalTradeTicket.isPresent()) {
                 throw new ResourceNotFoundException("Trade ticket not found");

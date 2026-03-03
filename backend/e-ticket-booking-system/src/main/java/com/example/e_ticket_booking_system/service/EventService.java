@@ -30,6 +30,7 @@ import com.example.e_ticket_booking_system.repository.EventScheduleRepository;
 import com.example.e_ticket_booking_system.repository.UserRepository;
 import com.example.e_ticket_booking_system.repository.VenueRepository;
 
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -45,6 +46,7 @@ public class EventService {
     private final VenueRepository venueRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
+    private final EntityManager entityManager;
 
     public EventResponse createEvent(Long organizerId, CreateEventRequest request) {
         // Tìm organizer theo ID
@@ -122,7 +124,25 @@ public class EventService {
     }
 
     public List<EventResponse> getPublishedEvents(Long categoryId, String name) {
-        List<Event> events = eventRepository.searchEvents("PUBLISHED", categoryId, name);
+        StringBuilder sql = new StringBuilder("SELECT * FROM events WHERE status = 'PUBLISHED'");
+
+        if (categoryId != null) {
+            sql.append(" AND category_id = :categoryId");
+        }
+        if (name != null) {
+            sql.append(" AND LOWER(name) LIKE :name");
+        }
+
+        var query = entityManager.createNativeQuery(sql.toString(), Event.class);
+
+        if (categoryId != null) {
+            query.setParameter("categoryId", categoryId);
+        }
+        if (name != null) {
+            query.setParameter("name", "%" + name.toLowerCase() + "%");
+        }
+
+        List<Event> events = query.getResultList();
         // Chuyển từ danh sách Event sang danh sách EventResponse
         List<EventResponse> responseList = new ArrayList<>();
         for (Event event : events) {

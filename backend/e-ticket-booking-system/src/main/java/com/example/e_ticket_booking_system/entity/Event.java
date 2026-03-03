@@ -70,8 +70,8 @@ public class Event {
      * - false: Vé không thể transfer (event VIP/restricted)
      * 
      * Impact: 
-     * - Event.allowTicketExchange = false → Ticket.isTransferable = false
-     * - Event.allowTicketExchange = true → Ticket.isTransferable phụ thuộc TicketType setting
+     * - Event.allowTicketExchange = false → Ticket.transferable = false
+     * - Event.allowTicketExchange = true → Ticket.transferable phụ thuộc TicketType setting
      */
     @Column(name = "allow_ticket_exchange")
     private Boolean allowTicketExchange;

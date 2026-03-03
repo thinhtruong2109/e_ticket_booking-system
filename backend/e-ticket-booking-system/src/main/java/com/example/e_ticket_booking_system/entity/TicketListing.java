@@ -31,8 +31,8 @@ public class TicketListing {
         /**
      * FOREIGN KEY CONSTRAINT: ticket_id
      * BUSINESS RULE: Ticket không thể listed nếu:
-     * 1. Ticket.isCheckedIn = true (vé đã sử dụng)
-     * 2. Ticket.isTransferable = false (vé không được phép chuyển nhượng)
+     * 1. Ticket.checkedIn = true (vé đã sử dụng)
+     * 2. Ticket.transferable = false (vé không được phép chuyển nhượng)
      * 
      * Validation: Phải được kiểm tra tại Service Layer trước khi persist
      */    @ManyToOne(optional = false)

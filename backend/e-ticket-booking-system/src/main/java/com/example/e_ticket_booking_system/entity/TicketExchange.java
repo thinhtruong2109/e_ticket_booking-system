@@ -33,7 +33,7 @@ public class TicketExchange {
     /**
      * Tham chiếu đến TicketListing - vé được trao đổi
      * BUSINESS RULE: Ticket trong TicketListing không thể:
-     * 1. Đã check-in (isCheckedIn = true)
+     * 1. Đã check-in (checkedIn = true)
      * 2. Listing status phải = FOR_SALE
      */
     @ManyToOne(optional = false)

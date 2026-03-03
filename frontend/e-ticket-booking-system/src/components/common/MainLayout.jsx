@@ -165,27 +165,29 @@ const Header = () => {
   );
 
   return (
-    <AppBar position="sticky">
+    <AppBar
+      position="sticky"
+      sx={{
+        borderTop: '0px solid #fff',
+        borderLeft: '0px solid #fff',
+        borderRight: '0px solid #fff',
+      }}
+    >
       <Container maxWidth="lg">
-        <Toolbar disableGutters sx={{ minHeight: { xs: 56, md: 64 } }}>
+        <Toolbar disableGutters sx={{ minHeight: { xs: 68, md: 72 } }}>
           {isMobile && (
             <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(true)} sx={{ mr: 1 }}>
               <MenuIcon />
             </IconButton>
           )}
 
-          <Typography
-            variant="h6"
-            sx={{
-              fontWeight: 700,
-              letterSpacing: '-0.3px',
-              cursor: 'pointer',
-              fontSize: { xs: '1rem', md: '1.125rem' },
-            }}
+          <Box
+            component="img"
+            src="/APPICON.png"
+            alt="Alo Vé"
+            sx={{ height: 45, width: 'auto', cursor: 'pointer' }}
             onClick={() => navigate('/')}
-          >
-            E-Ticket
-          </Typography>
+          />
 
           {!isMobile && (
             <Box sx={{ display: 'flex', gap: 0.5, ml: 4 }}>
@@ -310,9 +312,12 @@ const Footer = () => (
     <Container maxWidth="lg">
       <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: 3 }}>
         <Box>
-          <Typography variant="h6" color="white" fontWeight={700} gutterBottom>
-            E-Ticket
-          </Typography>
+          <Box
+            component="img"
+            src="/APPICON.png"
+            alt="Alo Vé"
+            sx={{ height: 45, width: 'auto', mb: 1 }}
+          />
           <Typography variant="body2" sx={{ maxWidth: 300 }}>
             Your trusted platform for booking event tickets. Discover, book, and enjoy amazing events.
           </Typography>
@@ -336,7 +341,7 @@ const Footer = () => (
       </Box>
       <Divider sx={{ my: 3, borderColor: 'grey.800' }} />
       <Typography variant="caption" sx={{ color: 'grey.500' }}>
-        &copy; 2026 E-Ticket. All rights reserved.
+        &copy; 2026 Alo Vé. All rights reserved.
       </Typography>
     </Container>
   </Box>

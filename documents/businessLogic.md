@@ -394,8 +394,8 @@
     - Generate QR code (embed ticket_code + event_id + schedule_id)
     - Create Ticket record
     - Set current_owner_id = booking.customer_id
-    - Set is_transferable = (event.allow_ticket_exchange AND ticket_type.allow_transfer)
-    - Set is_checked_in = false
+    - Set transferable = (event.allow_ticket_exchange AND ticket_type.allow_transfer)
+    - Set checkedIn = false
     - Link ticket to booking, ticket_type
 
 ### **11.2. Get Ticket Details**
@@ -419,13 +419,13 @@
 
 ### **12.2. Validate Ticket**
 - Check ticket exists
-- Check ticket.is_checked_in = false (chưa sử dụng)
+- Check ticket.checkedIn = false (chưa sử dụng)
 - Check event_schedule matches (đúng suất diễn)
 - Check ticket chưa hết hạn (schedule.start_time chưa quá)
 
 ### **12.3. Check-In Ticket**
 - Update ticket:
-  - is_checked_in = true
+  - checkedIn = true
   - checked_in_at = now
   - checked_in_by = staff_user_id
 - Return success message
@@ -450,8 +450,8 @@
 - User muốn bán/trao đổi vé
 - Validate:
   - Ticket belongs to user (current_owner_id = user_id)
-  - Ticket.is_transferable = true
-  - Ticket.is_checked_in = false
+  - Ticket.transferable = true
+  - Ticket.checkedIn = false
   - Event.allow_ticket_exchange = true
 - User set listing_price, exchange_type (SELL/TRADE/BOTH)
 - Create TicketListing với status = FOR_SALE
@@ -478,7 +478,7 @@
 - User A muốn đổi vé A lấy vé B
 - Validate:
   - Trade ticket exists, belongs to user A
-  - Trade ticket is_transferable = true, not checked-in
+  - Trade ticket transferable = true, not checked-in
 - Create TicketExchange:
   - transaction_type = TRADE
   - trade_ticket_id = ticket A
@@ -881,7 +881,7 @@
 2. **Timeout Logic**: Booking và SeatReservation phải có expiration
 3. **Payment First**: Không generate ticket trước khi payment success
 4. **Check-In Once**: Một ticket chỉ check-in được 1 lần
-5. **Transferable Control**: Respect Event.allow_ticket_exchange và Ticket.is_transferable
+5. **Transferable Control**: Respect Event.allow_ticket_exchange và Ticket.transferable
 6. **Refund Policy**: Time-based refund calculation
 7. **Role-Based Access**: Strict permission checking
 8. **Audit Trail**: Log tất cả ticket transfers và critical actions

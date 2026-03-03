@@ -46,7 +46,7 @@ const ListingDetailPage = () => {
       if (res.data.exchangeType === 'TRADE' || res.data.exchangeType === 'BOTH') {
         const ticketsRes = await ticketApi.getMyTickets();
         const available = (Array.isArray(ticketsRes.data) ? ticketsRes.data : [])
-          .filter((t) => t.isTransferable && !t.isCheckedIn);
+          .filter((t) => t.transferable && !t.checkedIn);
         setMyTickets(available);
       }
     } catch (err) {

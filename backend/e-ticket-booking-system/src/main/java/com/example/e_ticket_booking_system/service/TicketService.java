@@ -1,5 +1,6 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -26,8 +27,6 @@ import com.example.e_ticket_booking_system.repository.TicketRepository;
 import com.example.e_ticket_booking_system.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -73,8 +72,8 @@ public class TicketService {
                 if (event.getAllowTicketExchange() != null && event.getAllowTicketExchange()) {
                     isTransferable = true;
                 }
-                ticket.setIsTransferable(isTransferable);
-                ticket.setIsCheckedIn(false);
+                ticket.setTransferable(isTransferable);
+                ticket.setCheckedIn(false);
 
                 ticketRepository.save(ticket);
                 log.info("Ticket generated: {} for booking: {}", ticketCode, booking.getBookingCode());
@@ -117,7 +116,7 @@ public class TicketService {
             return new CheckInResponse(false, "Ticket not found", request.getTicketCode(), null, null, null);
         }
 
-        if (ticket.getIsCheckedIn() != null && ticket.getIsCheckedIn()) {
+        if (ticket.getCheckedIn() != null && ticket.getCheckedIn()) {
             return new CheckInResponse(false,
                     "Ticket already checked in at " + ticket.getCheckedInAt(),
                     ticket.getTicketCode(),
@@ -141,7 +140,7 @@ public class TicketService {
         }
         User staff = optionalStaff.get();
 
-        ticket.setIsCheckedIn(true);
+        ticket.setCheckedIn(true);
         ticket.setCheckedInAt(LocalDateTime.now());
         ticket.setCheckedInBy(staff);
         ticketRepository.save(ticket);
@@ -183,8 +182,8 @@ public class TicketService {
         response.setQrCode(ticket.getQrCode());
         response.setCurrentOwnerId(ticket.getCurrentOwner().getId());
         response.setCurrentOwnerName(ticket.getCurrentOwner().getFullName());
-        response.setIsTransferable(ticket.getIsTransferable());
-        response.setIsCheckedIn(ticket.getIsCheckedIn());
+        response.setTransferable(ticket.getTransferable());
+        response.setCheckedIn(ticket.getCheckedIn());
         response.setCheckedInAt(ticket.getCheckedInAt());
 
         // Lấy tên người check-in nếu có

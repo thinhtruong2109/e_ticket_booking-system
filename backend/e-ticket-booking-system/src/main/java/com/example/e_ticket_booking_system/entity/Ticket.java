@@ -50,7 +50,7 @@ public class Ticket {
      * - Ban đầu = booking.customer
      * - Được update mỗi khi vé được trao đổi/bán thành công
      * 
-     * CONSTRAINT: currentOwner không thể update nếu isCheckedIn = true
+     * CONSTRAINT: currentOwner không thể update nếu checkedIn = true
      */
     @ManyToOne(optional = false)
     @JoinColumn(name = "current_owner_id", nullable = false,
@@ -62,15 +62,15 @@ public class Ticket {
      * - true: vé có thể được list/exchange
      * - false: vé không thể bao giờ được chuyển nhượng (VIP lifetime ticket, etc)
      * 
-     * CONSTRAINT: Nếu isTransferable = false, TicketListing không thể được tạo
+     * CONSTRAINT: Nếu transferable = false, TicketListing không thể được tạo
      */
     @Column(name = "is_transferable")
-    private Boolean isTransferable;
+    private Boolean transferable;
     
     /**
      * Flag tracking check-in status
      * 
-     * CRITICAL CONSTRAINT: Khi isCheckedIn = true:
+     * CRITICAL CONSTRAINT: Khi checkedIn = true:
      * 1. Vé KHÔNG thể được listed lên TicketListing
      * 2. Vé KHÔNG thể được trao đổi qua TicketExchange
      * 3. currentOwner KHÔNG thể được thay đổi
@@ -78,7 +78,7 @@ public class Ticket {
      * Validation: Phải được check tại Service Layer khi listing/exchange
      */
     @Column(name = "is_checked_in")
-    private Boolean isCheckedIn;
+    private Boolean checkedIn;
     
     @Column(name = "checked_in_at")
     private LocalDateTime checkedInAt;
@@ -98,11 +98,11 @@ public class Ticket {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
-        if (isCheckedIn == null) {
-            isCheckedIn = false;
+        if (checkedIn == null) {
+            checkedIn = false;
         }
-        if (isTransferable == null) {
-            isTransferable = true;
+        if (transferable == null) {
+            transferable = true;
         }
     }
     

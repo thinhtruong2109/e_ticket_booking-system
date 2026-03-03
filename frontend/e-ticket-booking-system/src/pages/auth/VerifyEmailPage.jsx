@@ -99,9 +99,12 @@ const VerifyEmailPage = () => {
       }}
     >
       <Paper sx={{ maxWidth: 440, width: '100%', p: { xs: 3, sm: 5 }, textAlign: 'center' }}>
-        <Typography variant="h5" fontWeight={700} sx={{ letterSpacing: '-0.3px', mb: 1 }}>
-          E-Ticket
-        </Typography>
+        <Box
+          component="img"
+          src="/APPICON.png"
+          alt="Alo Vé"
+          sx={{ height: 45, width: 'auto', mb: 1.5 }}
+        />
         <Typography variant="overline" color="text.secondary" display="block" sx={{ mb: 3 }}>
           Email Verification
         </Typography>

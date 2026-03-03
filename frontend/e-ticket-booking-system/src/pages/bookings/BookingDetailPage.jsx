@@ -152,7 +152,7 @@ const BookingDetailPage = () => {
                         <TableCell>{ticket.ticketTypeName || '-'}</TableCell>
                         <TableCell>{ticket.seatNumber || 'N/A'}</TableCell>
                         <TableCell align="center">
-                          {ticket.isCheckedIn ? (
+                          {ticket.checkedIn ? (
                             <StatusChip status="COMPLETED" />
                           ) : (
                             <StatusChip status="PENDING" />

@@ -63,7 +63,7 @@ const MyTicketsPage = () => {
                       <Typography variant="subtitle2" fontWeight={600}>
                         {ticket.eventName || 'Event'}
                       </Typography>
-                      {ticket.isCheckedIn ? (
+                      {ticket.checkedIn ? (
                         <Chip label="Used" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white' }} />
                       ) : (
                         <Chip label="Valid" size="small" color="success" variant="outlined"
@@ -115,11 +115,11 @@ const MyTicketsPage = () => {
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography variant="caption" color="text.secondary">Transferable</Typography>
                       <Typography variant="caption" fontWeight={600}>
-                        {ticket.isTransferable ? 'Yes' : 'No'}
+                        {ticket.transferable ? 'Yes' : 'No'}
                       </Typography>
                     </Box>
 
-                    {ticket.isTransferable && !ticket.isCheckedIn && (
+                    {ticket.transferable && !ticket.checkedIn && (
                       <Button
                         fullWidth
                         variant="outlined"

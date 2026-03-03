@@ -56,11 +56,11 @@ public class TicketExchangeService {
             throw new ForbiddenException("You don't own this ticket");
         }
 
-        if (ticket.getIsTransferable() == null || !ticket.getIsTransferable()) {
+        if (ticket.getTransferable() == null || !ticket.getTransferable()) {
             throw new BadRequestException("This ticket is not transferable");
         }
 
-        if (ticket.getIsCheckedIn() != null && ticket.getIsCheckedIn()) {
+        if (ticket.getCheckedIn() != null && ticket.getCheckedIn()) {
             throw new BadRequestException("Cannot list a ticket that has been checked in");
         }
 
@@ -202,7 +202,7 @@ public class TicketExchangeService {
                 throw new ForbiddenException("You don't own the trade ticket");
             }
 
-            if (tradeTicket.getIsCheckedIn() != null && tradeTicket.getIsCheckedIn()) {
+            if (tradeTicket.getCheckedIn() != null && tradeTicket.getCheckedIn()) {
                 throw new BadRequestException("Trade ticket has already been checked in");
             }
 

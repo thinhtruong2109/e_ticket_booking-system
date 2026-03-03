@@ -21,8 +21,8 @@ public class TicketResponse {
     private String qrCode;
     private Long currentOwnerId;
     private String currentOwnerName;
-    private Boolean isTransferable;
-    private Boolean isCheckedIn;
+    private Boolean transferable;
+    private Boolean checkedIn;
     private LocalDateTime checkedInAt;
     private String checkedInByName;
     private LocalDateTime createdAt;

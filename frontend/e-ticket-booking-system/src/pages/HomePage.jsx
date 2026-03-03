@@ -33,10 +33,10 @@ const HomePage = () => {
     const load = async () => {
       try {
         const [evRes, catRes] = await Promise.all([
-          eventApi.getAll(),
+          eventApi.getPublishedEvents(),
           categoryApi.getAll(),
         ]);
-        setEvents(Array.isArray(evRes.data) ? evRes.data.slice(0, 6) : []);
+        setEvents(Array.isArray(evRes.data) ? evRes.data.slice(0, 6) : (evRes.data.content ? evRes.data.content.slice(0, 6) : []));
         setCategories(Array.isArray(catRes.data) ? catRes.data : []);
       } catch {
         /* silent */
@@ -72,7 +72,7 @@ const HomePage = () => {
           background: 'radial-gradient(circle at 50% 0%, rgba(99,102,241,0.15), transparent 70%)',
         }} />
         <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1 }}>
-          <Typography variant="h2" fontWeight={800} sx={{ mb: 2, fontSize: { xs: '2rem', md: '3rem' } }}>
+          <Typography variant="h2" fontWeight={800} sx={{ mb: 2, fontSize: { xs: '2rem', md: '3rem' }, color: '#fff' }}>
             Your Next Experience
             <br />
             <Box component="span" sx={{ color: '#818cf8' }}>Starts Here</Box>
@@ -148,7 +148,7 @@ const HomePage = () => {
       {/* Features */}
       <Container maxWidth="lg" sx={{ py: 8 }}>
         <Box sx={{ textAlign: 'center', mb: 5 }}>
-          <Typography variant="h5" fontWeight={700}>Why Choose Us</Typography>
+          <Typography variant="h5" fontWeight={700}>Why Choose Alo Vé?</Typography>
           <Typography variant="body1" color="text.secondary">
             Everything you need for a seamless event experience
           </Typography>
@@ -171,7 +171,7 @@ const HomePage = () => {
         <Container maxWidth="sm">
           <Typography variant="h5" fontWeight={700} sx={{ mb: 2 }}>Ready to Get Started?</Typography>
           <Typography variant="body1" sx={{ color: '#9ca3af', mb: 3 }}>
-            Join thousands of event-goers and organizers on our platform.
+            Join thousands of event-goers and organizers on Alo Vé.
           </Typography>
           <Button
             variant="contained"

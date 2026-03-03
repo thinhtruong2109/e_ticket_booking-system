@@ -97,7 +97,7 @@ Entity trung tâm - Quản lý sự kiện
 - **allowTicketExchange**: Flag kiểm soát secondary market
   - `true`: Cho phép user bán/trao đổi vé trên platform
   - `false`: Vé không thể chuyển nhượng (event VIP/restricted)
-  - Impact: Nếu false, tất cả tickets của event sẽ có isTransferable = false
+  - Impact: Nếu false, tất cả tickets của event sẽ có transferable = false
 - Lưu hình ảnh: bannerImageUrl, thumbnailImageUrl cho marketing
 
 ---
@@ -243,10 +243,10 @@ Vé điện tử cá nhân - Sản phẩm cuối cùng user nhận được
 - **checked_in_by** *(FK → users.id, NULLABLE)*: ID của STAFF đã quét vé. Nullable vì chỉ có giá trị sau khi check-in xảy ra
 - **ticketCode**: Human-readable unique identifier
 - **qrCode**: Encrypted string/Base64 image để check-in (format: TICKET_ID|EVENT_ID|SCHEDULE_ID|HMAC)
-- **isTransferable**: Flag kiểm soát khả năng chuyển nhượng
+- **transferable**: Flag kiểm soát khả năng chuyển nhượng
   - `true`: Vé có thể list/sell trên marketplace
   - `false`: Vé locked, không thể chuyển (VIP event)
-- **isCheckedIn**: CRITICAL FLAG
+- **checkedIn**: CRITICAL FLAG
   - Khi `true`: Vé đã sử dụng, KHÔNG thể list, KHÔNG thể exchange, KHÔNG thể thay đổi owner
 - **checkedInAt**: Timestamp khi vé được quét vào cửa
 - Mỗi BookingDetail tạo ra quantity Tickets tương ứng
@@ -274,11 +274,11 @@ Quản lý việc hold/reserve ghế - Giải quyết race condition
 Secondary market - User đăng vé để bán/trao đổi
 
 ### Logic nghiệp vụ
-- **ticket_id** *(FK → tickets.id, NOT NULL)*: Vé nào đang được đăng bán/trao đổi. Service layer phải validate ticket.isCheckedIn = false và ticket.isTransferable = true trước khi tạo listing
+- **ticket_id** *(FK → tickets.id, NOT NULL)*: Vé nào đang được đăng bán/trao đổi. Service layer phải validate ticket.checkedIn = false và ticket.transferable = true trước khi tạo listing
 - **seller_id** *(FK → users.id, NOT NULL)*: Người đăng bán. Validate seller phải là currentOwner của ticket, tránh đăng bán vé không phải của mình
 - **BUSINESS RULES (validate ở Service Layer):**
-  - Ticket KHÔNG thể listed nếu isCheckedIn = true (đã sử dụng)
-  - Ticket KHÔNG thể listed nếu isTransferable = false
+  - Ticket KHÔNG thể listed nếu checkedIn = true (đã sử dụng)
+  - Ticket KHÔNG thể listed nếu transferable = false
   - Event PHẢI có allowTicketExchange = true
 - **exchangeType:** SELL (bán), TRADE (đổi), BOTH (vừa bán vừa đổi)
 - **listingPrice:** Giá người bán đặt (market-driven, có thể > hoặc < giá gốc)
@@ -296,7 +296,7 @@ Ghi nhận giao dịch trao đổi vé trên secondary market
 - **ticket_listing_id** *(FK → ticket_listings.id, NOT NULL)*: Listing nào đang được giao dịch. Validate listing.status = FOR_SALE và chưa expired trước khi tạo exchange
 - **seller_id** *(FK → users.id, NOT NULL)*: Người bán — phải trùng với listing.seller_id
 - **buyer_id** *(FK → users.id, NOT NULL)*: Người mua — phải khác seller_id, tránh tự mua vé của chính mình
-- **trade_ticket_id** *(FK → tickets.id, NULLABLE)*: Chỉ có khi transactionType = TRADE. Vé mà buyer dùng để đổi lại cho seller. Phải validate isTransferable = true và isCheckedIn = false
+- **trade_ticket_id** *(FK → tickets.id, NULLABLE)*: Chỉ có khi transactionType = TRADE. Vé mà buyer dùng để đổi lại cho seller. Phải validate transferable = true và checkedIn = false
 - **payment_id** *(FK → payments.id, NULLABLE)*: Chỉ có khi transactionType = PURCHASE. Nullable vì TRADE không cần payment
 - **transactionType:**
   - PURCHASE: Mua bán bằng tiền (buyer → platform → seller)

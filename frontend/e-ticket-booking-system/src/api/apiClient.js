@@ -21,9 +21,20 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for token refresh
+// Response interceptor: unwrap ApiResponse & handle token refresh
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Unwrap backend ApiResponse wrapper { success, message, data } → keep only data
+    if (
+      response.data &&
+      typeof response.data === 'object' &&
+      'success' in response.data &&
+      'data' in response.data
+    ) {
+      response.data = response.data.data;
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -40,7 +51,9 @@ apiClient.interceptors.response.use(
           refreshToken,
         });
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data;
+        // Unwrap ApiResponse wrapper from raw axios call
+        const responseData = response.data?.data ?? response.data;
+        const { accessToken, refreshToken: newRefreshToken } = responseData;
         localStorage.setItem('accessToken', accessToken);
         if (newRefreshToken) {
           localStorage.setItem('refreshToken', newRefreshToken);

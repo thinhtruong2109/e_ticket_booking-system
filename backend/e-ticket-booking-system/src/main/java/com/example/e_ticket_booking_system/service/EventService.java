@@ -2,8 +2,10 @@ package com.example.e_ticket_booking_system.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,9 +17,12 @@ import com.example.e_ticket_booking_system.dto.response.EventCategoryResponse;
 import com.example.e_ticket_booking_system.dto.response.EventResponse;
 import com.example.e_ticket_booking_system.dto.response.UserResponse;
 import com.example.e_ticket_booking_system.dto.response.VenueResponse;
+import com.example.e_ticket_booking_system.entity.Booking;
 import com.example.e_ticket_booking_system.entity.Event;
 import com.example.e_ticket_booking_system.entity.EventCategory;
 import com.example.e_ticket_booking_system.entity.EventSchedule;
+import com.example.e_ticket_booking_system.entity.Ticket;
+import com.example.e_ticket_booking_system.entity.TicketListing;
 import com.example.e_ticket_booking_system.entity.User;
 import com.example.e_ticket_booking_system.entity.Venue;
 import com.example.e_ticket_booking_system.exception.BadRequestException;
@@ -27,6 +32,8 @@ import com.example.e_ticket_booking_system.repository.BookingRepository;
 import com.example.e_ticket_booking_system.repository.EventCategoryRepository;
 import com.example.e_ticket_booking_system.repository.EventRepository;
 import com.example.e_ticket_booking_system.repository.EventScheduleRepository;
+import com.example.e_ticket_booking_system.repository.TicketListingRepository;
+import com.example.e_ticket_booking_system.repository.TicketRepository;
 import com.example.e_ticket_booking_system.repository.UserRepository;
 import com.example.e_ticket_booking_system.repository.VenueRepository;
 
@@ -46,6 +53,9 @@ public class EventService {
     private final VenueRepository venueRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
+    private final TicketRepository ticketRepository;
+    private final TicketListingRepository ticketListingRepository;
+    private final EmailService emailService;
     private final EntityManager entityManager;
 
     public EventResponse createEvent(Long organizerId, CreateEventRequest request) {
@@ -171,29 +181,179 @@ public class EventService {
         return responseList;
     }
 
+    @Transactional
     public EventResponse updateEvent(Long eventId, Long organizerId, UpdateEventRequest request) {
         Event event = getEventAndCheckOwner(eventId, organizerId);
 
-        // If bookings exist, restrict certain changes
-        boolean hasBookings = !bookingRepository.findByEventId(eventId).isEmpty();
+        // ============================================================
+        // 1. Thu thập các thay đổi để track & thông báo cho customers
+        // ============================================================
+        List<String> changes = new ArrayList<>();
+        boolean hasActiveBookings = false;
 
-        if (request.getName() != null) event.setName(request.getName());
-        if (request.getDescription() != null) event.setDescription(request.getDescription());
-        if (request.getCategoryId() != null) {
+        // Lấy danh sách bookings active (PENDING hoặc CONFIRMED) của event
+        List<Booking> allBookings = bookingRepository.findByEventId(eventId);
+        List<Booking> activeBookings = new ArrayList<>();
+        for (Booking b : allBookings) {
+            if ("PENDING".equals(b.getStatus()) || "CONFIRMED".equals(b.getStatus())) {
+                activeBookings.add(b);
+            }
+        }
+        hasActiveBookings = !activeBookings.isEmpty();
+
+        // ============================================================
+        // 2. Cập nhật từng trường và track thay đổi
+        // ============================================================
+
+        // --- Tên event ---
+        if (request.getName() != null && !request.getName().equals(event.getName())) {
+            String oldName = event.getName();
+            event.setName(request.getName());
+            changes.add("Event name changed from \"" + oldName + "\" to \"" + request.getName() + "\"");
+        }
+
+        // --- Mô tả ---
+        if (request.getDescription() != null && !request.getDescription().equals(event.getDescription())) {
+            event.setDescription(request.getDescription());
+            changes.add("Event description has been updated");
+        }
+
+        // --- Category ---
+        if (request.getCategoryId() != null && !request.getCategoryId().equals(event.getCategory().getId())) {
             Optional<EventCategory> optionalCat = categoryRepository.findById(request.getCategoryId());
             if (!optionalCat.isPresent()) {
                 throw new ResourceNotFoundException("Category not found");
             }
-            EventCategory category = optionalCat.get();
-            event.setCategory(category);
+            EventCategory newCategory = optionalCat.get();
+            String oldCategoryName = event.getCategory().getName();
+            event.setCategory(newCategory);
+            changes.add("Event category changed from \"" + oldCategoryName + "\" to \"" + newCategory.getName() + "\"");
         }
-        if (request.getBannerImageUrl() != null) event.setBannerImageUrl(request.getBannerImageUrl());
-        if (request.getThumbnailImageUrl() != null) event.setThumbnailImageUrl(request.getThumbnailImageUrl());
-        if (request.getAllowTicketExchange() != null) event.setAllowTicketExchange(request.getAllowTicketExchange());
 
+        // --- Venue (địa điểm) ---
+        if (request.getVenueId() != null && !request.getVenueId().equals(event.getVenue().getId())) {
+            Optional<Venue> optionalVenue = venueRepository.findById(request.getVenueId());
+            if (!optionalVenue.isPresent()) {
+                throw new ResourceNotFoundException("Venue not found with id: " + request.getVenueId());
+            }
+            Venue newVenue = optionalVenue.get();
+            String oldVenueInfo = event.getVenue().getName() + " (" + event.getVenue().getAddress() + ")";
+            String newVenueInfo = newVenue.getName() + " (" + newVenue.getAddress() + ")";
+            event.setVenue(newVenue);
+            changes.add("Event venue changed from \"" + oldVenueInfo + "\" to \"" + newVenueInfo + "\"");
+        }
+
+        // --- Banner/Thumbnail ---
+        if (request.getBannerImageUrl() != null) {
+            event.setBannerImageUrl(request.getBannerImageUrl());
+        }
+        if (request.getThumbnailImageUrl() != null) {
+            event.setThumbnailImageUrl(request.getThumbnailImageUrl());
+        }
+
+        // ============================================================
+        // 3. Xử lí allowTicketExchange - cascade tới Tickets & Listings
+        // ============================================================
+        if (request.getAllowTicketExchange() != null
+                && !request.getAllowTicketExchange().equals(event.getAllowTicketExchange())) {
+
+            Boolean oldValue = event.getAllowTicketExchange();
+            Boolean newValue = request.getAllowTicketExchange();
+            event.setAllowTicketExchange(newValue);
+
+            if (Boolean.FALSE.equals(newValue)) {
+                // === TẮT trao đổi vé ===
+                // 3a. Cập nhật tất cả tickets của event: transferable = false
+                List<Ticket> eventTickets = ticketRepository.findByEventId(eventId);
+                for (Ticket ticket : eventTickets) {
+                    ticket.setTransferable(false);
+                    ticketRepository.save(ticket);
+                }
+                log.info("Disabled transferable for {} tickets of event: {}", eventTickets.size(), event.getName());
+
+                // 3b. Hủy tất cả TicketListings đang active (FOR_SALE)
+                List<TicketListing> activeListings = ticketListingRepository.findByEventIdAndStatus(eventId, "FOR_SALE");
+                for (TicketListing listing : activeListings) {
+                    listing.setStatus("CANCELLED");
+                    ticketListingRepository.save(listing);
+                }
+                if (!activeListings.isEmpty()) {
+                    log.info("Cancelled {} active ticket listings for event: {}", activeListings.size(), event.getName());
+                }
+
+                changes.add("Ticket exchange has been DISABLED - All active ticket listings have been cancelled. Tickets can no longer be transferred or resold");
+
+            } else {
+                // === BẬT lại trao đổi vé ===
+                // Cập nhật tickets: transferable = true (cho phép lại)
+                List<Ticket> eventTickets = ticketRepository.findByEventId(eventId);
+                for (Ticket ticket : eventTickets) {
+                    ticket.setTransferable(true);
+                    ticketRepository.save(ticket);
+                }
+                log.info("Enabled transferable for {} tickets of event: {}", eventTickets.size(), event.getName());
+
+                changes.add("Ticket exchange has been ENABLED - Tickets can now be transferred and resold on the marketplace");
+            }
+        }
+
+        // ============================================================
+        // 4. Lưu event đã cập nhật
+        // ============================================================
         event = eventRepository.save(event);
         log.info("Event updated: {}", event.getName());
+
+        // ============================================================
+        // 5. Gửi thông báo email cho tất cả customers có booking active
+        //    (chỉ khi có thay đổi quan trọng VÀ có booking active)
+        // ============================================================
+        if (hasActiveBookings && !changes.isEmpty()) {
+            notifyBookedCustomers(event, activeBookings, changes);
+        }
+
         return toResponse(event);
+    }
+
+    /**
+     * Gửi email thông báo cập nhật event cho tất cả customers đang có booking active.
+     * Dùng Set<email> để tránh gửi trùng nếu 1 customer có nhiều bookings.
+     */
+    private void notifyBookedCustomers(Event event, List<Booking> activeBookings, List<String> changes) {
+        // Build nội dung HTML cho phần thay đổi
+        StringBuilder changesHtml = new StringBuilder();
+        for (String change : changes) {
+            changesHtml.append("<p style=\"margin: 0 0 8px; color: #111827; font-size: 14px;\">")
+                       .append("&#8226; ").append(change)
+                       .append("</p>");
+        }
+
+        // Track email đã gửi để tránh duplicate
+        Set<String> notifiedEmails = new HashSet<>();
+
+        for (Booking booking : activeBookings) {
+            User customer = booking.getCustomer();
+            String email = customer.getEmail();
+
+            // Gửi email cho mỗi booking (1 customer có thể có nhiều booking → gửi mỗi booking 1 email)
+            try {
+                emailService.sendEventUpdateNotification(
+                        email,
+                        customer.getFullName(),
+                        event.getName(),
+                        booking.getBookingCode(),
+                        changesHtml.toString()
+                );
+                notifiedEmails.add(email);
+                log.info("Sent event update notification to {} for booking {}", email, booking.getBookingCode());
+            } catch (Exception e) {
+                // Không throw exception nếu gửi email fail → đảm bảo update event vẫn thành công
+                log.error("Failed to send event update notification to {} for booking {}: {}",
+                        email, booking.getBookingCode(), e.getMessage());
+            }
+        }
+
+        log.info("Event update notifications sent to {} unique customers for event: {}",
+                notifiedEmails.size(), event.getName());
     }
 
     // Admin methods

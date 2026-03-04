@@ -32,6 +32,7 @@ import com.example.e_ticket_booking_system.repository.PromocodeRepository;
 import com.example.e_ticket_booking_system.repository.TicketTypeRepository;
 import com.example.e_ticket_booking_system.repository.UserRepository;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -46,6 +47,7 @@ public class PromoCodeService {
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
     private final SecurityUtils securityUtils;
+    private final EntityManager entityManager;
 
     // ======================= ADMIN: Create GLOBAL promo code =======================
 
@@ -368,33 +370,68 @@ public class PromoCodeService {
             eventOrganizerId = event.getOrganizer().getId();
         }
 
-        // 2. Query promo codes phù hợp cho event này (3 queries riêng biệt, merge kết quả)
+        // 2. Query promo codes phù hợp cho event này bằng native SQL (3 queries riêng biệt, merge kết quả)
         LocalDateTime now = LocalDateTime.now();
         List<PromoCode> availablePromos = new ArrayList<>();
 
         // 2a. GLOBAL: áp dụng cho tất cả events
-        List<PromoCode> globalPromos = promoCodeRepository
-                .findByApplicationTypeAndStatusAndValidFromLessThanEqualAndValidToGreaterThanEqual(
-                        "GLOBAL", "ACTIVE", now, now);
+        StringBuilder globalSql = new StringBuilder();
+        globalSql.append("SELECT * FROM promo_codes ");
+        globalSql.append("WHERE application_type = 'GLOBAL' ");
+        globalSql.append("AND status = 'ACTIVE' ");
+        globalSql.append("AND valid_from <= '").append(now).append("' ");
+        globalSql.append("AND valid_to >= '").append(now).append("'");
+
+        List<PromoCode> globalPromos = entityManager
+                .createNativeQuery(globalSql.toString(), PromoCode.class)
+                .getResultList();
         availablePromos.addAll(globalPromos);
+        
+        log.debug("Found {} GLOBAL promo codes", globalPromos.size());
 
         // 2b. ORGANIZER_ALL: áp dụng cho tất cả events của organizer đó
-        List<PromoCode> organizerPromos = promoCodeRepository
-                .findByApplicationTypeAndCreatedByIdAndStatusAndValidFromLessThanEqualAndValidToGreaterThanEqual(
-                        "ORGANIZER_ALL", eventOrganizerId, "ACTIVE", now, now);
+        StringBuilder organizerSql = new StringBuilder();
+        organizerSql.append("SELECT * FROM promo_codes ");
+        organizerSql.append("WHERE application_type = 'ORGANIZER_ALL' ");
+        organizerSql.append("AND created_by = ").append(eventOrganizerId).append(" ");
+        organizerSql.append("AND status = 'ACTIVE' ");
+        organizerSql.append("AND valid_from <= '").append(now).append("' ");
+        organizerSql.append("AND valid_to >= '").append(now).append("'");
+        List<PromoCode> organizerPromos = entityManager
+                .createNativeQuery(organizerSql.toString(), PromoCode.class)
+                .getResultList();
         availablePromos.addAll(organizerPromos);
+        log.debug("Found {} ORGANIZER_ALL promo codes for organizer {}", organizerPromos.size(), eventOrganizerId);
 
         // 2c. SPECIFIC_EVENTS: lấy promoCodeIds từ bảng join, rồi query promo codes
-        List<PromoCodeEventJoin> eventJoins = promoCodeEventRepository.findByEventId(request.getEventId());
-        List<Long> specificPromoIds = new ArrayList<>();
-        for (PromoCodeEventJoin join : eventJoins) {
-            specificPromoIds.add(join.getPromoCode().getId());
-        }
+        StringBuilder joinSql = new StringBuilder();
+        joinSql.append("SELECT promo_code_id FROM promo_code_events ");
+        joinSql.append("WHERE event_id = ").append(request.getEventId());
+        List<Long> specificPromoIds = entityManager
+                .createNativeQuery(joinSql.toString(), Long.class)
+                .getResultList();
+        log.debug("Found {} specific promo code IDs for event {}", specificPromoIds.size(), request.getEventId());
+
         if (!specificPromoIds.isEmpty()) {
-            List<PromoCode> specificPromos = promoCodeRepository
-                    .findByIdInAndStatusAndValidFromLessThanEqualAndValidToGreaterThanEqual(
-                            specificPromoIds, "ACTIVE", now, now);
+            StringBuilder specificSql = new StringBuilder();
+            specificSql.append("SELECT * FROM promo_codes ");
+            specificSql.append("WHERE id IN (");
+            for (int i = 0; i < specificPromoIds.size(); i++) {
+                if (i > 0) {
+                    specificSql.append(",");
+                }
+                specificSql.append(specificPromoIds.get(i));
+            }
+            specificSql.append(") ");
+            specificSql.append("AND status = 'ACTIVE' ");
+            specificSql.append("AND valid_from <= '").append(now).append("' ");
+            specificSql.append("AND valid_to >= '").append(now).append("'");
+
+            List<PromoCode> specificPromos = entityManager
+                    .createNativeQuery(specificSql.toString(), PromoCode.class)
+                    .getResultList();
             availablePromos.addAll(specificPromos);
+            log.debug("Found {} SPECIFIC_EVENTS promo codes", specificPromos.size());
         }
 
         List<PromoPreview> previews = new ArrayList<>();

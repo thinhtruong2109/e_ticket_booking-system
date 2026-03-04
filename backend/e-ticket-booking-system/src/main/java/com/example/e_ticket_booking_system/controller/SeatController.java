@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.e_ticket_booking_system.dto.request.BulkCreateSeatsRequest;
 import com.example.e_ticket_booking_system.dto.request.CreateSeatRequest;
 import com.example.e_ticket_booking_system.dto.request.CreateSectionRequest;
 import com.example.e_ticket_booking_system.dto.response.ApiResponse;
@@ -47,6 +48,13 @@ public class SeatController {
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
     public ResponseEntity<ApiResponse<SeatResponse>> createSeat(@Valid @RequestBody CreateSeatRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Seat created", seatService.createSeat(request)));
+    }
+
+    @PostMapping("/bulk")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<SeatResponse>>> bulkCreateSeats(
+            @Valid @RequestBody BulkCreateSeatsRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Seats created", seatService.bulkCreateSeats(request)));
     }
 
     @GetMapping("/venue/{venueId}")

@@ -42,9 +42,15 @@ public class Payment {
     
     @Column(name = "status", nullable = false, length = 20)
     private String status; // PENDING, SUCCESS, FAILED, REFUNDED
-    
-    @Column(name = "transaction_id", unique = true, length = 100)
-    private String transactionId;
+
+    @Column(name = "payos_order_code", unique = true)
+    private Long payosOrderCode;
+
+    @Column(name = "checkout_url", length = 500)
+    private String checkoutUrl;
+
+    @Column(name = "payment_link_id", length = 100)
+    private String paymentLinkId;
     
     @Column(name = "paid_at")
     private LocalDateTime paidAt;

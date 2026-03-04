@@ -17,6 +17,7 @@ public class ScheduledTaskService {
     private final PromoCodeService promoCodeService;
     private final EventService eventService;
     private final TicketExchangeService ticketExchangeService;
+    private final SeatService seatService;
 
     // Run every 1 minute - expire pending bookings
     @Scheduled(fixedRate = 60000)
@@ -26,6 +27,17 @@ public class ScheduledTaskService {
             bookingService.expireBookings();
         } catch (Exception e) {
             log.error("Error expiring bookings: {}", e.getMessage());
+        }
+    }
+
+    // Run every 1 minute - release expired seat reservations (safety net)
+    @Scheduled(fixedRate = 60000)
+    public void releaseExpiredSeatReservations() {
+        log.debug("Running scheduled task: release expired seat reservations");
+        try {
+            seatService.releaseExpiredReservations();
+        } catch (Exception e) {
+            log.error("Error releasing seat reservations: {}", e.getMessage());
         }
     }
 

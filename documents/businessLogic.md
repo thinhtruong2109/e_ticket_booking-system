@@ -346,34 +346,53 @@
 ## 💳 **10. PAYMENT SERVICE**
 
 ### **10.1. Create Payment**
-- Input: booking_id, payment_method (VNPAY, MOMO, STRIPE)
+- Input: booking_id, payment_method (PAYOS)
 - Validate booking exists, status = PENDING
 - Create Payment record với status = PENDING
-- Generate transaction_id unique
+- Tạo payosOrderCode unique
+- **Ghi log TransactionHistory** (PAYMENT + PENDING)
 
-### **10.2. VNPay Payment Flow**
-- Build VNPay request params
-- Generate secure hash
-- Return payment URL
-- User redirect đến VNPay
-- User thanh toán
-- VNPay redirect về callback URL
+### **10.2. PayOS Payment Flow**
+- Tạo `payosOrderCode` unique (timestamp % 1000000000 + bookingId % 1000)
+- Build PayOS payment link request: orderCode, amount, description ("DH" + bookingCode), buyer info
+- Thêm orderCode vào returnUrl và cancelUrl (để frontend xử lý sau khi redirect)
+- Gọi PayOS API tạo link thanh toán QR
+- Lưu checkoutUrl, paymentLinkId vào Payment entity
+- Return PaymentResponse (chứa checkoutUrl cho frontend redirect)
+- User scan QR hoặc mở link thanh toán trên trang PayOS
+- PayOS gửi webhook khi trạng thái thay đổi
+- PayOS redirect user về returnUrl (thành công) hoặc cancelUrl (hủy)
 
-### **10.3. Payment Callback (Webhook)**
-- Receive callback từ payment gateway
-- Validate signature/hash
-- Parse transaction status
-- If SUCCESS:
+### **10.3. PayOS Webhook Processing**
+- Endpoint: `POST /api/payments/payos/webhook` (public, không cần authentication)
+- Xác thực webhook signature qua PayOS SDK (`payOS.webhooks().verify(body)`)
+- Parse `data.orderCode` và `data.code` từ webhook payload
+- `data.code = "00"` → thanh toán thành công:
   - Update Payment: status = SUCCESS, paid_at = now
   - Update Booking: status = CONFIRMED
   - Generate tickets
   - **Tăng `usedCount` của promo code** (nếu booking có BookingPromoCode)
     - Query BookingPromoCode theo booking_id
     - Với mỗi promo đã áp dụng: promo.usedCount += 1
-  - Send notification
-- If FAILED:
+  - **Ghi log TransactionHistory** (PAYMENT + SUCCESS)
+- `data.code != "00"` → thanh toán thất bại:
   - Update Payment: status = FAILED
-  - Có thể retry hoặc cancel booking
+  - **Ghi log TransactionHistory** (PAYMENT + FAILED)
+- **Luôn trả về HTTP 200** (`{"success": true}`) để PayOS không retry liên tục
+
+### **10.3.1. PayOS Payment Info (Sync)**
+- Endpoint: `GET /api/payments/payos/{orderCode}`
+- Gọi PayOS API lấy trạng thái mới nhất của payment
+- Nếu PayOS trả PAID mà DB chưa SUCCESS → gọi processPaymentResult(true) → confirm booking + generate tickets
+- Nếu PayOS trả CANCELLED mà DB còn PENDING → update status = CANCELLED + ghi log TransactionHistory
+- Trả về PaymentResponse với trạng thái đã đồng bộ
+
+### **10.3.2. Cancel PayOS Payment**
+- Endpoint: `PUT /api/payments/payos/{orderCode}/cancel`
+- Chỉ cancel được khi Payment status = PENDING
+- Gọi PayOS API hủy payment link
+- Update Payment status = CANCELLED
+- **Ghi log TransactionHistory** (PAYMENT + CANCELLED)
 
 ### **10.4. Refund Payment**
 - Input: booking_id, refund_amount
@@ -381,6 +400,56 @@
 - Call payment gateway refund API
 - Update Payment: status = REFUNDED
 - Create refund transaction record
+- **Ghi log TransactionHistory** (REFUND + SUCCESS)
+
+---
+
+## 💰 **10.5. TRANSACTION HISTORY SERVICE**
+
+> Service ghi nhận immutable log cho mọi thay đổi trạng thái thanh toán.
+> Được gọi internally từ PaymentService — không có endpoint tạo mới từ bên ngoài.
+
+### **10.5.1. Log Payment Created**
+- Trigger: Khi PaymentService tạo payment mới
+- Tạo record: transactionType = PAYMENT, status = PENDING
+- Ghi nhận amount, paymentMethod, bookingId
+
+### **10.5.2. Log Payment Success**
+- Trigger: Khi payment callback/webhook xác nhận thanh toán thành công
+- Tạo record: transactionType = PAYMENT, status = SUCCESS
+
+### **10.5.3. Log Payment Failed**
+- Trigger: Khi payment callback/webhook báo thất bại
+- Tạo record: transactionType = PAYMENT, status = FAILED
+
+### **10.5.4. Log Payment Cancelled**
+- Trigger: Khi hủy thanh toán PayOS hoặc nhận status CANCELLED từ PayOS
+- Tạo record: transactionType = PAYMENT, status = CANCELLED
+
+### **10.5.5. Log Refund**
+- Trigger: Khi PaymentService xử lý hoàn tiền
+- Tạo record: transactionType = REFUND, status = SUCCESS
+
+### **10.5.6. Log Exchange Payment**
+- Trigger: Khi mua vé trên marketplace
+- Tạo record: transactionType = EXCHANGE_PAYMENT, status tương ứng
+
+### **10.5.7. Get My Transactions**
+- User xem lịch sử giao dịch của mình
+- Có thể filter theo transactionType
+- Sắp xếp mới nhất trước
+
+### **10.5.8. Get Transactions by Booking**
+- Lấy toàn bộ lịch sử giao dịch liên quan đến 1 booking
+- Hiển thị timeline: PENDING → SUCCESS/FAILED → REFUNDED
+
+### **10.5.9. Admin: Get All Transactions**
+- Admin xem toàn bộ lịch sử giao dịch
+- Dùng cho báo cáo, reconciliation, audit
+
+### **10.5.10. Admin: Get Transactions by User**
+- Admin xem lịch sử giao dịch của user bất kỳ
+- Hỗ trợ xử lý dispute
 
 ---
 
@@ -729,7 +798,57 @@
 
 ---
 
-## 🔍 **19. SEARCH & FILTER SERVICE**
+## � **19. ORGANIZER E-WALLET SERVICE**
+
+### **19.1. Get My Wallet (Organizer)**
+- Validate user.role = ORGANIZER
+- Nếu chưa có ví → tự động tạo mới (lazy creation) với balance = 0
+- Return wallet info (balance, totalWithdrawn, bank info)
+
+### **19.2. Update Bank Info (Organizer)**
+- Validate user.role = ORGANIZER
+- Update bankName, bankAccountNumber, bankAccountHolder
+- Phải cập nhật trước khi rút tiền được
+
+### **19.3. Request Withdrawal (Organizer)**
+- Validate user.role = ORGANIZER
+- Validate đã cập nhật bank info (bankName, bankAccountNumber not null)
+- Validate amount >= 10,000 VND (minimum withdrawal)
+- Validate balance >= amount (đủ số dư)
+- Trừ wallet.balance, cộng wallet.totalWithdrawn
+- Tạo WalletTransaction (type=WITHDRAWAL, status=SUCCESS)
+- Return WalletTransaction info
+
+### **19.4. Get Wallet Transactions (Organizer)**
+- Lấy lịch sử giao dịch ví của organizer hiện tại
+- Optional filter theo transactionType (REVENUE, WITHDRAWAL, REFUND_DEDUCTION)
+- Sắp xếp theo createdAt DESC (mới nhất trước)
+
+### **19.5. Credit Revenue (Internal)**
+- Được gọi từ PaymentService khi payment SUCCESS
+- Input: organizerId, amount (= booking.finalAmount), bookingCode
+- Cộng amount vào wallet.balance
+- Tạo WalletTransaction (type=REVENUE, status=SUCCESS, referenceCode=bookingCode)
+
+### **19.6. Deduct Refund (Internal)**
+- Được gọi từ PaymentService khi refund payment
+- Input: organizerId, amount, bookingCode
+- Trừ amount khỏi wallet.balance (có thể âm)
+- Tạo WalletTransaction (type=REFUND_DEDUCTION, status=SUCCESS, referenceCode=bookingCode)
+
+### **19.7. Admin: Get All Wallets**
+- Lấy tất cả ví organizer trong hệ thống
+- Dùng để quản lý/giám sát tài chính
+
+### **19.8. Admin: Get Wallet by User ID**
+- Lấy ví của bất kỳ organizer nào theo userId
+
+### **19.9. Admin: Get Wallet Transactions by User ID**
+- Lấy lịch sử giao dịch ví của bất kỳ organizer nào
+
+---
+
+## 🔍 **20. SEARCH & FILTER SERVICE**
 
 ### **19.1. Event Search**
 - Full-text search by event name
@@ -753,7 +872,7 @@
 
 ---
 
-## 🕒 **20. SCHEDULED JOBS (Background Tasks)**
+## 🕒 **21. SCHEDULED JOBS (Background Tasks)**
 
 ### **20.1. Expire Pending Bookings** ✅ Đã implement
 - Run every 1 minute
@@ -789,7 +908,7 @@
 
 ---
 
-## 📈 **21. WAITLIST SERVICE (Optional)**
+## 📈 **22. WAITLIST SERVICE (Optional)**
 
 ### **21.1. Join Waitlist**
 - User join waitlist khi event sold out
@@ -802,7 +921,7 @@
 
 ---
 
-## 🎯 **22. RECOMMENDATION SERVICE (Optional)**
+## 🎯 **23. RECOMMENDATION SERVICE (Optional)**
 
 ### **22.1. Recommend Events**
 - Based on user's booking history
@@ -815,7 +934,7 @@
 
 ---
 
-## 🏷️ **23. LOYALTY PROGRAM SERVICE (Optional)**
+## 🏷️ **24. LOYALTY PROGRAM SERVICE (Optional)**
 
 ### **23.1. Accumulate Points**
 - User earn points for each booking
@@ -831,7 +950,7 @@
 
 ---
 
-## 🔧 **24. ADMIN CONFIGURATION SERVICE**
+## 🔧 **25. ADMIN CONFIGURATION SERVICE**
 
 ### **24.1. System Settings**
 - Booking timeout duration

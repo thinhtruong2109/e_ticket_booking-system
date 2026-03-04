@@ -1158,7 +1158,7 @@
 		},
 		{
 			"name": "Payments",
-			"description": "Payment processing endpoints",
+			"description": "Payment processing endpoints (PayOS integration)",
 			"item": [
 				{
 					"name": "Create Payment",
@@ -1172,43 +1172,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"bookingId\": 1,\n    \"paymentMethod\": \"VNPAY\"\n}"
+							"raw": "{\n    \"bookingId\": 1,\n    \"paymentMethod\": \"PAYOS\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/payments",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "payments"]
 						},
-						"description": "Create a payment for a booking. Payment methods: VNPAY, MOMO, STRIPE. Requires authentication."
-					},
-					"response": []
-				},
-				{
-					"name": "Payment Callback",
-					"request": {
-						"auth": {
-							"type": "noauth"
-						},
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/payments/callback?transactionId=TXN123456&success=true",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "payments", "callback"],
-							"query": [
-								{
-									"key": "transactionId",
-									"value": "TXN123456",
-									"description": "Transaction ID from payment provider"
-								},
-								{
-									"key": "success",
-									"value": "true",
-									"description": "Whether the payment was successful"
-								}
-							]
-						},
-						"description": "Payment callback from payment provider. Public endpoint."
+						"description": "Create a payment for a booking. Creates PayOS payment link with QR code. Returns checkoutUrl for redirect. Requires authentication."
 					},
 					"response": []
 				},
@@ -1218,18 +1189,113 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/payments/booking/1?bookingId=1",
+							"raw": "{{baseUrl}}/api/payments/booking/1",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "payments", "booking", "1"],
+							"path": ["api", "payments", "booking", "1"]
+						},
+						"description": "Get payment details for a booking by bookingId (path variable). Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get PayOS Payment Info (Sync)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/payos/123456789",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "payos", "123456789"]
+						},
+						"description": "Get payment info from PayOS and sync status. If PayOS says PAID but DB is not SUCCESS, auto-confirms. If PayOS says CANCELLED but DB is PENDING, auto-cancels. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel PayOS Payment",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/payos/123456789/cancel",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "payos", "123456789", "cancel"]
+						},
+						"description": "Cancel a PayOS payment link. Only works for PENDING payments. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "PayOS Webhook",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"00\",\n    \"desc\": \"success\",\n    \"success\": true,\n    \"data\": {\n        \"orderCode\": 123456789,\n        \"amount\": 500000,\n        \"description\": \"DHBK20260303001\",\n        \"code\": \"00\",\n        \"desc\": \"Thanh cong\",\n        \"reference\": \"TF230204212323\",\n        \"transactionDateTime\": \"2026-03-03 10:30:00\",\n        \"paymentLinkId\": \"abc123\"\n    },\n    \"signature\": \"...\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/payos/webhook",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "payos", "webhook"]
+						},
+						"description": "PayOS webhook endpoint. PayOS sends POST here when payment status changes. data.code='00' means success. Public endpoint (verified by PayOS signature). Always returns 200 OK."
+					},
+					"response": []
+				},
+				{
+					"name": "PayOS Success Redirect",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/payos/success?orderCode=123456789",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "payos", "success"],
 							"query": [
 								{
-									"key": "bookingId",
-									"value": "1",
-									"description": "Booking ID"
+									"key": "orderCode",
+									"value": "123456789",
+									"description": "PayOS order code"
 								}
 							]
 						},
-						"description": "Get payment details for a booking. Requires authentication."
+						"description": "PayOS redirects here after successful payment. Returns payment info. Public endpoint."
+					},
+					"response": []
+				},
+				{
+					"name": "PayOS Cancel Redirect",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/payos/cancel?orderCode=123456789",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "payos", "cancel"],
+							"query": [
+								{
+									"key": "orderCode",
+									"value": "123456789",
+									"description": "PayOS order code"
+								}
+							]
+						},
+						"description": "PayOS redirects here when user cancels payment. Public endpoint."
 					},
 					"response": []
 				}
@@ -1308,10 +1374,10 @@
 		},
 		{
 			"name": "Promo Codes",
-			"description": "Promo code management endpoints (Admin only)",
+			"description": "Promo code management endpoints.\n\n**Phân quyền:**\n- ADMIN: Chỉ tạo GLOBAL promo codes. Có quyền xem/sửa/deactivate tất cả promo codes.\n- ORGANIZER: Tạo ORGANIZER_ALL hoặc SPECIFIC_EVENTS. Chỉ CRUD promo codes do mình tạo.\n- Authenticated users: Xem promo codes khả dụng cho đơn hàng.",
 			"item": [
 				{
-					"name": "[Admin] Create Promo Code",
+					"name": "[Admin] Create Promo Code (GLOBAL)",
 					"request": {
 						"method": "POST",
 						"header": [
@@ -1322,14 +1388,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"code\": \"SUMMER2026\",\n    \"description\": \"Summer discount 20%\",\n    \"discountType\": \"PERCENTAGE\",\n    \"discountValue\": 20,\n    \"minOrderAmount\": 100000,\n    \"maxDiscountAmount\": 500000,\n    \"usageLimit\": 1000,\n    \"validFrom\": \"2026-06-01T00:00:00\",\n    \"validTo\": \"2026-08-31T23:59:59\"\n}"
+							"raw": "{\n    \"code\": \"SUMMER2026\",\n    \"description\": \"Summer discount 20%\",\n    \"discountType\": \"PERCENTAGE\",\n    \"discountValue\": 20,\n    \"minOrderAmount\": 100000,\n    \"maxDiscountAmount\": 500000,\n    \"usageLimit\": 1000,\n    \"validFrom\": \"2026-06-01T00:00:00\",\n    \"validTo\": \"2026-08-31T23:59:59\",\n    \"applicationType\": \"GLOBAL\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/promo-codes",
+							"raw": "{{baseUrl}}/api/promo-codes/admin",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "promo-codes"]
+							"path": ["api", "promo-codes", "admin"]
 						},
-						"description": "Create a new promo code. Discount types: PERCENTAGE, FIXED_AMOUNT. Requires ADMIN role."
+						"description": "Admin creates a GLOBAL promo code (applies to all events). applicationType must be GLOBAL. Requires ADMIN role."
 					},
 					"response": []
 				},
@@ -1339,11 +1405,11 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/promo-codes",
+							"raw": "{{baseUrl}}/api/promo-codes/admin",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "promo-codes"]
+							"path": ["api", "promo-codes", "admin"]
 						},
-						"description": "Get all promo codes. Requires ADMIN role."
+						"description": "Get all promo codes (including organizer-created ones). Requires ADMIN role."
 					},
 					"response": []
 				},
@@ -1353,9 +1419,9 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/promo-codes/active",
+							"raw": "{{baseUrl}}/api/promo-codes/admin/active",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "promo-codes", "active"]
+							"path": ["api", "promo-codes", "admin", "active"]
 						},
 						"description": "Get all active promo codes. Requires ADMIN role."
 					},
@@ -1367,11 +1433,34 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/promo-codes/1",
+							"raw": "{{baseUrl}}/api/promo-codes/admin/1",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "promo-codes", "1"]
+							"path": ["api", "promo-codes", "admin", "1"]
 						},
-						"description": "Get promo code details by ID. Requires ADMIN role."
+						"description": "Get promo code details by ID (any promo code). Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Update Promo Code",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"SUMMER2026\",\n    \"description\": \"Updated summer discount\",\n    \"discountType\": \"PERCENTAGE\",\n    \"discountValue\": 25,\n    \"minOrderAmount\": 100000,\n    \"maxDiscountAmount\": 600000,\n    \"usageLimit\": 2000,\n    \"validFrom\": \"2026-06-01T00:00:00\",\n    \"validTo\": \"2026-09-30T23:59:59\",\n    \"applicationType\": \"GLOBAL\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/admin/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "admin", "1"]
+						},
+						"description": "Update any promo code. Requires ADMIN role."
 					},
 					"response": []
 				},
@@ -1381,11 +1470,122 @@
 						"method": "PUT",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/promo-codes/1/deactivate",
+							"raw": "{{baseUrl}}/api/promo-codes/admin/1/deactivate",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "promo-codes", "1", "deactivate"]
+							"path": ["api", "promo-codes", "admin", "1", "deactivate"]
 						},
-						"description": "Deactivate a promo code. Requires ADMIN role."
+						"description": "Deactivate any promo code (set status to DISABLED). Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer] Create Promo Code (ORGANIZER_ALL)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"MYEVENTS20\",\n    \"description\": \"20% off all my events\",\n    \"discountType\": \"PERCENTAGE\",\n    \"discountValue\": 20,\n    \"minOrderAmount\": 100000,\n    \"maxDiscountAmount\": 500000,\n    \"usageLimit\": 200,\n    \"validFrom\": \"2026-06-01T00:00:00\",\n    \"validTo\": \"2026-08-31T23:59:59\",\n    \"applicationType\": \"ORGANIZER_ALL\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/organizer",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "organizer"]
+						},
+						"description": "Organizer creates promo code for ALL their events. applicationType: ORGANIZER_ALL. Requires ORGANIZER role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer] Create Promo Code (SPECIFIC_EVENTS)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"EVENT123\",\n    \"description\": \"Discount for specific events\",\n    \"discountType\": \"FIXED_AMOUNT\",\n    \"discountValue\": 50000,\n    \"minOrderAmount\": 200000,\n    \"usageLimit\": 100,\n    \"validFrom\": \"2026-06-01T00:00:00\",\n    \"validTo\": \"2026-08-31T23:59:59\",\n    \"applicationType\": \"SPECIFIC_EVENTS\",\n    \"eventIds\": [1, 3, 5]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/organizer",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "organizer"]
+						},
+						"description": "Organizer creates promo code for SPECIFIC events. applicationType: SPECIFIC_EVENTS. eventIds required (must belong to organizer). Requires ORGANIZER role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer] Get My Promo Codes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/organizer",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "organizer"]
+						},
+						"description": "Get promo codes created by the current organizer. Requires ORGANIZER role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer] Get Promo Code By ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/organizer/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "organizer", "1"]
+						},
+						"description": "Get promo code details (only own promo codes, returns 403 if not owner). Requires ORGANIZER role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer] Update Promo Code",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"MYEVENTS25\",\n    \"description\": \"Updated: 25% off\",\n    \"discountType\": \"PERCENTAGE\",\n    \"discountValue\": 25,\n    \"minOrderAmount\": 100000,\n    \"maxDiscountAmount\": 600000,\n    \"usageLimit\": 300,\n    \"validFrom\": \"2026-06-01T00:00:00\",\n    \"validTo\": \"2026-09-30T23:59:59\",\n    \"applicationType\": \"ORGANIZER_ALL\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/organizer/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "organizer", "1"]
+						},
+						"description": "Update own promo code. Cannot change to GLOBAL. Requires ORGANIZER role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Organizer] Deactivate Promo Code",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/promo-codes/organizer/1/deactivate",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "promo-codes", "organizer", "1", "deactivate"]
+						},
+						"description": "Deactivate own promo code (set status to DISABLED). Requires ORGANIZER role."
 					},
 					"response": []
 				},
@@ -1408,7 +1608,7 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "promo-codes", "available"]
 						},
-						"description": "Get available promo codes for an order with discount preview. Requires authentication (any logged-in user, not ADMIN-only). Returns totalAmount and list of applicable promo codes with discountAmount and finalAmount."
+						"description": "Get available promo codes for an order with discount preview. Returns GLOBAL + ORGANIZER_ALL (matching organizer) + SPECIFIC_EVENTS (matching event) promo codes. Requires authentication (any logged-in user)."
 					},
 					"response": []
 				}
@@ -1515,14 +1715,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"ticketListingId\": 1,\n    \"transactionType\": \"PURCHASE\",\n    \"paymentMethod\": \"VNPAY\"\n}"
+							"raw": "{\n    \"ticketListingId\": 1,\n    \"transactionType\": \"PURCHASE\",\n    \"paymentMethod\": \"PAYOS\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/ticket-listings/exchanges",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "ticket-listings", "exchanges"]
 						},
-						"description": "Initiate a ticket exchange/purchase. Transaction types: PURCHASE, TRADE. For TRADE, include tradeTicketId. Payment methods: VNPAY, MOMO, STRIPE. Requires authentication."
+						"description": "Initiate a ticket exchange/purchase. Transaction types: PURCHASE, TRADE. For TRADE, include tradeTicketId. Payment method: PAYOS. Requires authentication."
 					},
 					"response": []
 				},
@@ -1574,6 +1774,246 @@
 							"path": ["api", "ticket-listings", "exchanges", "1"]
 						},
 						"description": "Cancel a ticket exchange. Requires authentication."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Transaction Histories",
+			"description": "Transaction history endpoints - immutable audit log for all payment state changes",
+			"item": [
+				{
+					"name": "Get My Transactions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/transaction-histories/my-transactions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transaction-histories", "my-transactions"]
+						},
+						"description": "Get all transaction history for the current user. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Transactions By Type",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/transaction-histories/my-transactions?type=PAYMENT",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transaction-histories", "my-transactions"],
+							"query": [
+								{
+									"key": "type",
+									"value": "PAYMENT",
+									"description": "Filter by type: PAYMENT, REFUND, EXCHANGE_PAYMENT, EXCHANGE_REFUND"
+								}
+							]
+						},
+						"description": "Get transaction history filtered by type. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transactions By Booking",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/transaction-histories/booking/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transaction-histories", "booking", "1"]
+						},
+						"description": "Get transaction history for a specific booking. Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Transactions By Payment",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/transaction-histories/payment/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transaction-histories", "payment", "1"]
+						},
+						"description": "Get transaction history for a specific payment (shows status timeline). Requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get All Transactions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/transaction-histories/admin",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transaction-histories", "admin"]
+						},
+						"description": "Get all transaction history in the system. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get Transactions By User",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/transaction-histories/admin/user/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "transaction-histories", "admin", "user", "1"]
+						},
+						"description": "Get transaction history for a specific user. Requires ADMIN role."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Organizer E-Wallet",
+			"description": "Organizer eWallet management: view wallet, update bank info, withdraw, view transactions. Admin can view all wallets.",
+			"item": [
+				{
+					"name": "Get My Wallet",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/organizer/wallet",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "organizer", "wallet"]
+						},
+						"description": "Get the current organizer's eWallet info. If no wallet exists, one is created automatically. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Bank Info",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bankName\": \"Vietcombank\",\n    \"bankAccountNumber\": \"1234567890\",\n    \"bankAccountHolder\": \"NGUYEN VAN A\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/organizer/wallet/bank-info",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "organizer", "wallet", "bank-info"]
+						},
+						"description": "Update bank account information for withdrawals. Must be set before requesting a withdrawal. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "Request Withdrawal",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"amount\": 500000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/organizer/wallet/withdraw",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "organizer", "wallet", "withdraw"]
+						},
+						"description": "Request a withdrawal from the organizer's eWallet to their bank account. Minimum amount: 10,000 VND. Bank info must be set first. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Wallet Transactions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/organizer/wallet/transactions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "organizer", "wallet", "transactions"]
+						},
+						"description": "Get all wallet transactions for the current organizer. Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Wallet Transactions By Type",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/organizer/wallet/transactions?type=REVENUE",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "organizer", "wallet", "transactions"],
+							"query": [
+								{
+									"key": "type",
+									"value": "REVENUE",
+									"description": "Filter by type: REVENUE, WITHDRAWAL, REFUND_DEDUCTION"
+								}
+							]
+						},
+						"description": "Get wallet transactions filtered by type. Types: REVENUE (ticket sales income), WITHDRAWAL (bank withdrawals), REFUND_DEDUCTION (refund deductions). Requires ORGANIZER or ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get All Wallets",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/organizer/wallet/admin/all",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "organizer", "wallet", "admin", "all"]
+						},
+						"description": "Get all organizer eWallets in the system. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get Wallet By User ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/organizer/wallet/admin/user/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "organizer", "wallet", "admin", "user", "1"]
+						},
+						"description": "Get a specific organizer's eWallet by their user ID. Requires ADMIN role."
+					},
+					"response": []
+				},
+				{
+					"name": "[Admin] Get Wallet Transactions By User ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/organizer/wallet/admin/user/1/transactions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "organizer", "wallet", "admin", "user", "1", "transactions"]
+						},
+						"description": "Get wallet transaction history for a specific organizer by their user ID. Requires ADMIN role."
 					},
 					"response": []
 				}

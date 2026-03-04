@@ -224,9 +224,9 @@ Quản lý giao dịch thanh toán
 
 ### Logic nghiệp vụ
 - **booking_id** *(FK → bookings.id, NOT NULL + UNIQUE)*: Quan hệ One-to-One với Booking. UNIQUE đảm bảo một booking chỉ có đúng một payment record. Khi payment SUCCESS thì trigger confirm booking và generate tickets
-- **paymentMethod**: Hỗ trợ nhiều gateway (VNPAY, MOMO, STRIPE, etc.)
+- **paymentMethod**: Hiện tại chỉ hỗ trợ PAYOS
 - **Status workflow:** PENDING → SUCCESS/FAILED → REFUNDED
-- **transactionId**: UNIQUE, ID từ payment gateway (dùng cho reconciliation)
+- **payosOrderCode**: UNIQUE, mã đơn hàng trên PayOS (dùng cho reconciliation)
 - **paidAt**: Timestamp chính xác khi thanh toán thành công
 
 ---
@@ -326,3 +326,87 @@ Audit trail - Immutable log cho việc chuyển nhượng vé
   - Audit trail: Vé đã đổi tay bao nhiêu lần
   - Fraud detection: Phát hiện flipping quá nhiều lần
   - Chain of custody tracking
+
+---
+
+## 20. OrganizerEWallet Entity
+### Tác dụng
+Ví điện tử của Organizer - Quản lý doanh thu từ bán vé và rút tiền
+
+### Logic nghiệp vụ
+- **user_id** *(FK → users.id, NOT NULL, UNIQUE)*: Mỗi organizer chỉ có 1 ví. OneToOne relationship
+- **balance**: Số dư hiện tại (doanh thu chưa rút). Tăng khi payment SUCCESS, giảm khi rút tiền hoặc hoàn vé
+- **totalWithdrawn**: Tổng số tiền đã rút về ngân hàng (chỉ tăng, dùng để thống kê)
+- **bankName / bankAccountNumber / bankAccountHolder**: Thông tin ngân hàng để rút tiền. Phải cập nhật trước khi rút tiền
+- Ví được tạo tự động khi organizer truy cập lần đầu (lazy creation)
+- **Flow doanh thu:**
+  1. Customer thanh toán booking thành công (Payment.status = SUCCESS)
+  2. Hệ thống tự động cộng `booking.finalAmount` vào `balance` của organizer
+  3. Tạo WalletTransaction record loại REVENUE
+- **Flow rút tiền:**
+  1. Organizer gọi API rút tiền
+  2. Validate: đủ balance, đã cập nhật bank info
+  3. Trừ balance, cộng totalWithdrawn
+  4. Tạo WalletTransaction record loại WITHDRAWAL
+- **Flow hoàn tiền:**
+  1. Khi refund booking → trừ balance organizer
+  2. Tạo WalletTransaction record loại REFUND_DEDUCTION
+  3. Balance có thể âm nếu organizer đã rút tiền trước khi có refund
+
+---
+
+## 21. WalletTransaction Entity
+### Tác dụng
+Immutable log ghi nhận mọi biến động số dư ví Organizer
+
+### Logic nghiệp vụ
+- **wallet_id** *(FK → organizer_e_wallets.id, NOT NULL)*: Ví liên quan. Dùng để query lịch sử giao dịch của một ví
+- **transactionType**: Phân loại giao dịch:
+  - `REVENUE`: Doanh thu từ bán vé (tiền vào ví)
+  - `WITHDRAWAL`: Rút tiền về tài khoản ngân hàng (tiền ra ví)
+  - `REFUND_DEDUCTION`: Trừ tiền khi hoàn vé cho khách (tiền ra ví)
+- **amount**: Số tiền giao dịch (luôn dương, precision 15, scale 2)
+- **balanceAfter**: Snapshot số dư SAU giao dịch
+- **description**: Mô tả chi tiết (VD: "Doanh thu từ booking BK20260303001")
+- **referenceCode**: Mã tham chiếu (bookingCode)
+- **status**: `SUCCESS`, `PENDING`, `FAILED`
+- **Immutable logging:** Chỉ có createdAt, KHÔNG có updatedAt
+- Mỗi lần balance thay đổi → tạo 1 record mới, KHÔNG BAO GIỜ update/delete
+- Dùng để:
+  - Audit trail: Toàn bộ lịch sử biến động ví organizer
+  - Đối soát doanh thu
+  - Báo cáo tài chính cho organizer
+
+---
+
+## 22. TransactionHistory Entity
+### Tác dụng
+Lịch sử giao dịch - Immutable log ghi nhận mọi thay đổi trạng thái thanh toán trong hệ thống
+
+### Logic nghiệp vụ
+- **payment_id** *(FK → payments.id, NOT NULL)*: Payment liên quan đến giao dịch. Dùng để query toàn bộ lịch sử thay đổi trạng thái của một payment
+- **user_id** *(FK → users.id, NOT NULL)*: User thực hiện hoặc liên quan (người mua/người được hoàn tiền)
+- **booking_id** *(FK → bookings.id, NULLABLE)*: Booking liên quan để query nhanh mà không cần join qua Payment. Nullable vì giao dịch marketplace có thể không gắn booking trực tiếp
+- **transactionType**: Phân loại giao dịch:
+  - `PAYMENT`: Thanh toán booking thông thường
+  - `REFUND`: Hoàn tiền booking
+  - `EXCHANGE_PAYMENT`: Thanh toán mua vé trên marketplace
+  - `EXCHANGE_REFUND`: Hoàn tiền giao dịch marketplace
+- **status**: Trạng thái giao dịch: `PENDING`, `SUCCESS`, `FAILED`, `CANCELLED`
+- **amount**: Số tiền giao dịch (precision 15, scale 2)
+- **description**: Mô tả chi tiết giao dịch (TEXT)
+- **paymentMethod**: Phương thức thanh toán (PAYOS)
+- **Immutable logging:** Chỉ có createdAt, KHÔNG có updatedAt
+- Mỗi lần payment chuyển trạng thái → tạo 1 record mới, KHÔNG BAO GIỜ update/delete
+- **Các thời điểm ghi log:**
+  1. Khi tạo payment mới (PAYMENT + PENDING)
+  2. Khi thanh toán thành công (PAYMENT + SUCCESS)
+  3. Khi thanh toán thất bại (PAYMENT + FAILED)
+  4. Khi hủy thanh toán (PAYMENT + CANCELLED)
+  5. Khi hoàn tiền (REFUND + SUCCESS)
+  6. Khi mua vé trên marketplace (EXCHANGE_PAYMENT + status tương ứng)
+- Dùng để:
+  - Audit trail: Toàn bộ lịch sử thanh toán của user
+  - Báo cáo doanh thu, giao dịch
+  - Reconciliation với payment gateway
+  - Hỗ trợ dispute/chargeback

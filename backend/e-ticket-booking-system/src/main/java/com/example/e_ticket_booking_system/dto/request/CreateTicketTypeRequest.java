@@ -12,6 +12,8 @@ public class CreateTicketTypeRequest {
     @NotNull(message = "Event ID is required")
     private Long eventId;
 
+    private Long sectionId; // Optional: link ticket type to a specific section
+
     @NotBlank(message = "Name is required")
     private String name;
 

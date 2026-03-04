@@ -1,5 +1,6 @@
 package com.example.e_ticket_booking_system.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -8,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.example.e_ticket_booking_system.dto.request.BulkCreateSeatsRequest;
 import com.example.e_ticket_booking_system.dto.request.CreateSeatRequest;
 import com.example.e_ticket_booking_system.dto.request.CreateSectionRequest;
 import com.example.e_ticket_booking_system.dto.response.SeatResponse;
@@ -99,6 +101,49 @@ public class SeatService {
         return toSeatResponse(seat, true);
     }
 
+    public List<SeatResponse> bulkCreateSeats(BulkCreateSeatsRequest request) {
+        Venue venue = venueRepository.findById(request.getVenueId())
+                .orElseThrow(() -> new ResourceNotFoundException("Venue not found with id: " + request.getVenueId()));
+
+        Section section = null;
+        if (request.getSectionId() != null) {
+            section = sectionRepository.findById(request.getSectionId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Section not found with id: " + request.getSectionId()));
+        }
+
+        String defaultSeatType = request.getSeatType() != null ? request.getSeatType() : "REGULAR";
+
+        List<Seat> seatsToSave = new ArrayList<>();
+        for (BulkCreateSeatsRequest.RowSpec row : request.getRows()) {
+            if (row.getEndNumber() < row.getStartNumber()) {
+                throw new IllegalArgumentException(
+                        "End number must be >= start number for row: " + row.getRowLabel());
+            }
+
+            String rowSeatType = row.getSeatType() != null ? row.getSeatType() : defaultSeatType;
+
+            for (int i = row.getStartNumber(); i <= row.getEndNumber(); i++) {
+                Seat seat = new Seat();
+                seat.setVenue(venue);
+                seat.setSection(section);
+                seat.setRowNumber(row.getRowLabel());
+                seat.setSeatNumber(String.valueOf(i));
+                seat.setSeatType(rowSeatType);
+                seatsToSave.add(seat);
+            }
+        }
+
+        List<Seat> savedSeats = seatRepository.saveAll(seatsToSave);
+        log.info("Bulk created {} seats at venue: {}", savedSeats.size(), venue.getName());
+
+        List<SeatResponse> responseList = new ArrayList<>();
+        for (Seat s : savedSeats) {
+            responseList.add(toSeatResponse(s, true));
+        }
+        return responseList;
+    }
+
     public List<SeatResponse> getSeatsByVenue(Long venueId) {
         List<Seat> seats = seatRepository.findByVenueId(venueId);
         List<SeatResponse> responseList = new ArrayList<>();
@@ -107,6 +152,18 @@ public class SeatService {
             responseList.add(response);
         }
         return responseList;
+    }
+
+    // Release seat reservations that have expired holdExpiresAt but still HOLDING
+    public void releaseExpiredReservations() {
+        List<SeatReservation> expired = seatReservationRepository
+                .findByStatusAndHoldExpiresAtBefore("HOLDING", LocalDateTime.now());
+        for (SeatReservation r : expired) {
+            r.setStatus("RELEASED");
+            seatReservationRepository.save(r);
+            log.info("Released expired seat reservation: seat {} for schedule {}",
+                    r.getSeat().getSeatNumber(), r.getEventSchedule().getId());
+        }
     }
 
     public List<SeatResponse> getAvailableSeats(Long eventScheduleId) {

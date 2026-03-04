@@ -14,6 +14,8 @@ import EventListPage from './pages/events/EventListPage';
 import EventDetailPage from './pages/events/EventDetailPage';
 import CreateBookingPage from './pages/bookings/CreateBookingPage';
 import PaymentPage from './pages/bookings/PaymentPage';
+import PaymentCancelPage from './pages/bookings/PaymentCancelPage';
+import PaymentSuccessPage from './pages/bookings/PaymentSuccessPage';
 import MyBookingsPage from './pages/bookings/MyBookingsPage';
 import BookingDetailPage from './pages/bookings/BookingDetailPage';
 import MyTicketsPage from './pages/tickets/MyTicketsPage';
@@ -51,6 +53,8 @@ function App() {
                   <Route path="/bookings/:id" element={<BookingDetailPage />} />
                   <Route path="/bookings/create/:eventId" element={<CreateBookingPage />} />
                   <Route path="/bookings/:id/payment" element={<PaymentPage />} />
+                  <Route path="/payment/cancel" element={<PaymentCancelPage />} />
+                  <Route path="/payment/success" element={<PaymentSuccessPage />} />
                   <Route path="/tickets" element={<MyTicketsPage />} />
                   <Route path="/profile" element={<ProfilePage />} />
                 </Route>

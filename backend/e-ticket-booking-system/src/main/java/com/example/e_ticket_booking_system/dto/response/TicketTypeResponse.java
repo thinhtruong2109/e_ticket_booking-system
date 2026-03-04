@@ -12,6 +12,8 @@ import lombok.NoArgsConstructor;
 public class TicketTypeResponse {
     private Long id;
     private Long eventId;
+    private Long sectionId;
+    private String sectionName;
     private String name;
     private String description;
     private BigDecimal price;

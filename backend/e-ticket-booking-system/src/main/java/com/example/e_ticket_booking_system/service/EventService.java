@@ -257,14 +257,18 @@ public class EventService {
         if (request.getAllowTicketExchange() != null
                 && !request.getAllowTicketExchange().equals(event.getAllowTicketExchange())) {
 
-            Boolean oldValue = event.getAllowTicketExchange();
             Boolean newValue = request.getAllowTicketExchange();
             event.setAllowTicketExchange(newValue);
 
             if (Boolean.FALSE.equals(newValue)) {
                 // === TẮT trao đổi vé ===
                 // 3a. Cập nhật tất cả tickets của event: transferable = false
-                List<Ticket> eventTickets = ticketRepository.findByEventId(eventId);
+                // Lấy tất cả tickets của event thông qua bookings
+                List<Booking> eventBookings = bookingRepository.findByEventId(eventId);
+                List<Ticket> eventTickets = new ArrayList<>();
+                for (Booking b : eventBookings) {
+                    eventTickets.addAll(ticketRepository.findByBookingId(b.getId()));
+                }
                 for (Ticket ticket : eventTickets) {
                     ticket.setTransferable(false);
                     ticketRepository.save(ticket);
@@ -272,7 +276,13 @@ public class EventService {
                 log.info("Disabled transferable for {} tickets of event: {}", eventTickets.size(), event.getName());
 
                 // 3b. Hủy tất cả TicketListings đang active (FOR_SALE)
-                List<TicketListing> activeListings = ticketListingRepository.findByEventIdAndStatus(eventId, "FOR_SALE");
+                List<TicketListing> activeListings = new ArrayList<>();
+                for (Ticket t : eventTickets) {
+                    TicketListing listing = ticketListingRepository.findByTicketId(t.getId());
+                    if (listing != null && "FOR_SALE".equals(listing.getStatus())) {
+                        activeListings.add(listing);
+                    }
+                }
                 for (TicketListing listing : activeListings) {
                     listing.setStatus("CANCELLED");
                     ticketListingRepository.save(listing);
@@ -286,7 +296,11 @@ public class EventService {
             } else {
                 // === BẬT lại trao đổi vé ===
                 // Cập nhật tickets: transferable = true (cho phép lại)
-                List<Ticket> eventTickets = ticketRepository.findByEventId(eventId);
+                List<Booking> eventBookings2 = bookingRepository.findByEventId(eventId);
+                List<Ticket> eventTickets = new ArrayList<>();
+                for (Booking b : eventBookings2) {
+                    eventTickets.addAll(ticketRepository.findByBookingId(b.getId()));
+                }
                 for (Ticket ticket : eventTickets) {
                     ticket.setTransferable(true);
                     ticketRepository.save(ticket);

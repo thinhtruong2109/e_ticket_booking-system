@@ -22,6 +22,7 @@ import com.example.e_ticket_booking_system.entity.BookingDetail;
 import com.example.e_ticket_booking_system.entity.BookingPromoCode;
 import com.example.e_ticket_booking_system.entity.Event;
 import com.example.e_ticket_booking_system.entity.EventSchedule;
+import com.example.e_ticket_booking_system.entity.Payment;
 import com.example.e_ticket_booking_system.entity.PromoCode;
 import com.example.e_ticket_booking_system.entity.PromoCodeEventJoin;
 import com.example.e_ticket_booking_system.entity.Seat;
@@ -36,6 +37,7 @@ import com.example.e_ticket_booking_system.repository.BookingPromoCodeRepository
 import com.example.e_ticket_booking_system.repository.BookingRepository;
 import com.example.e_ticket_booking_system.repository.EventRepository;
 import com.example.e_ticket_booking_system.repository.EventScheduleRepository;
+import com.example.e_ticket_booking_system.repository.PaymentRepository;
 import com.example.e_ticket_booking_system.repository.PromoCodeEventJoinRepository;
 import com.example.e_ticket_booking_system.repository.PromocodeRepository;
 import com.example.e_ticket_booking_system.repository.SeatRepository;
@@ -62,6 +64,9 @@ public class BookingService {
     private final UserRepository userRepository;
     private final PromocodeRepository promoCodeRepository;
     private final PromoCodeEventJoinRepository promoCodeEventRepository;
+    private final PaymentRepository paymentRepository;
+    private final PayOSService payOSService;
+    private final TransactionHistoryService transactionHistoryService;
 
     @Value("${booking.hold-duration-minutes:15}")
     private int holdDurationMinutes;
@@ -136,6 +141,32 @@ public class BookingService {
             details.add(detail);
         }
 
+        // Validate: tổng quantity phải bằng số seatIds (nếu có chọn ghế)
+        if (request.getSeatIds() != null && !request.getSeatIds().isEmpty()) {
+            int totalQuantity = 0;
+            for (BookingDetail detail : details) {
+                totalQuantity += detail.getQuantity();
+            }
+            if (totalQuantity != request.getSeatIds().size()) {
+                throw new BadRequestException(
+                        "Number of selected seats (" + request.getSeatIds().size()
+                        + ") must match total ticket quantity (" + totalQuantity + ")");
+            }
+        }
+
+        // Collect allowed section IDs from ticket types (for seat validation)
+        List<Long> allowedSectionIds = new ArrayList<>();
+        boolean hasTicketTypeWithSection = false;
+        for (BookingDetail detail : details) {
+            TicketType tt = detail.getTicketType();
+            if (tt.getSection() != null) {
+                hasTicketTypeWithSection = true;
+                if (!allowedSectionIds.contains(tt.getSection().getId())) {
+                    allowedSectionIds.add(tt.getSection().getId());
+                }
+            }
+        }
+
         // Handle seat reservations
         if (request.getSeatIds() != null && !request.getSeatIds().isEmpty() && schedule != null) {
             for (Long seatId : request.getSeatIds()) {
@@ -145,6 +176,17 @@ public class BookingService {
                     throw new ResourceNotFoundException("Seat not found: " + seatId);
                 }
                 Seat seat = optionalSeat.get();
+
+                // Validate: ghế phải thuộc đúng section của ticket type
+                if (hasTicketTypeWithSection && seat.getSection() != null) {
+                    if (!allowedSectionIds.contains(seat.getSection().getId())) {
+                        throw new BadRequestException(
+                                "Seat " + seat.getRowNumber() + seat.getSeatNumber()
+                                + " belongs to section '" + seat.getSection().getName()
+                                + "' which does not match your ticket type. "
+                                + "Please select seats in the correct section.");
+                    }
+                }
 
                 // Check seat availability
                 List<SeatReservation> existing = seatReservationRepository
@@ -189,6 +231,19 @@ public class BookingService {
         booking.setHoldExpiresAt(LocalDateTime.now().plusMinutes(holdDurationMinutes));
 
         booking = bookingRepository.save(booking);
+
+        // Gắn bookingId vào seat reservations vừa tạo
+        if (request.getSeatIds() != null && !request.getSeatIds().isEmpty() && schedule != null) {
+            List<SeatReservation> holdingReservations = seatReservationRepository
+                    .findByEventScheduleIdAndStatus(schedule.getId(), "HOLDING");
+            for (SeatReservation r : holdingReservations) {
+                if (r.getUser().getId().equals(customer.getId()) && r.getBooking() == null
+                        && request.getSeatIds().contains(r.getSeat().getId())) {
+                    r.setBooking(booking);
+                    seatReservationRepository.save(r);
+                }
+            }
+        }
 
         // Save booking details & decrease inventory
         for (BookingDetail detail : details) {
@@ -330,19 +385,75 @@ public class BookingService {
                 .findByStatusAndHoldExpiresAtBefore("PENDING", LocalDateTime.now());
 
         for (Booking booking : expired) {
+            // 1. Cancel PayOS payment link nếu có payment PENDING
+            Payment payment = paymentRepository.findByBookingId(booking.getId());
+            if (payment != null && "PENDING".equals(payment.getStatus())) {
+                if (payment.getPayosOrderCode() != null) {
+                    try {
+                        payOSService.cancelPayment(payment.getPayosOrderCode());
+                        log.info("PayOS payment link cancelled for expired booking: {}, orderCode: {}",
+                                booking.getBookingCode(), payment.getPayosOrderCode());
+                    } catch (Exception e) {
+                        log.error("Failed to cancel PayOS payment for expired booking {}: {}",
+                                booking.getBookingCode(), e.getMessage());
+                    }
+                }
+                payment.setStatus("CANCELLED");
+                paymentRepository.save(payment);
+                transactionHistoryService.logPaymentCancelled(payment);
+            }
+
+            // 2. Release seats
             List<SeatReservation> reservations = seatReservationRepository.findByBookingId(booking.getId());
             for (SeatReservation reservation : reservations) {
                 reservation.setStatus("RELEASED");
                 seatReservationRepository.save(reservation);
             }
 
+            // 3. Restore inventory
             List<BookingDetail> details = bookingDetailRepository.findByBookingId(booking.getId());
             restoreInventory(booking, details);
 
+            // 4. Mark booking as expired
             booking.setStatus("EXPIRED");
             bookingRepository.save(booking);
             log.info("Booking expired: {}", booking.getBookingCode());
         }
+    }
+
+    /**
+     * Huỷ booking bởi hệ thống (không cần kiểm tra quyền user).
+     * Dùng khi PayOS cancel hoặc payment thất bại.
+     */
+    @Transactional
+    public void cancelBookingBySystem(Long bookingId) {
+        Optional<Booking> optionalBooking = bookingRepository.findById(bookingId);
+        if (!optionalBooking.isPresent()) {
+            log.warn("cancelBookingBySystem: Booking not found: {}", bookingId);
+            return;
+        }
+        Booking booking = optionalBooking.get();
+
+        if (!"PENDING".equals(booking.getStatus())) {
+            log.info("cancelBookingBySystem: Booking {} is already in status '{}', skipping.",
+                    booking.getBookingCode(), booking.getStatus());
+            return;
+        }
+
+        // Release seats
+        List<SeatReservation> reservations = seatReservationRepository.findByBookingId(bookingId);
+        for (SeatReservation reservation : reservations) {
+            reservation.setStatus("RELEASED");
+            seatReservationRepository.save(reservation);
+        }
+
+        // Restore inventory
+        List<BookingDetail> details = bookingDetailRepository.findByBookingId(bookingId);
+        restoreInventory(booking, details);
+
+        booking.setStatus("CANCELLED");
+        bookingRepository.save(booking);
+        log.info("Booking cancelled by system: {}", booking.getBookingCode());
     }
 
     @Transactional

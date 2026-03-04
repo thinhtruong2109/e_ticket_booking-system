@@ -11,11 +11,13 @@ import org.springframework.stereotype.Service;
 import com.example.e_ticket_booking_system.dto.request.CreateTicketTypeRequest;
 import com.example.e_ticket_booking_system.dto.response.TicketTypeResponse;
 import com.example.e_ticket_booking_system.entity.Event;
+import com.example.e_ticket_booking_system.entity.Section;
 import com.example.e_ticket_booking_system.entity.TicketType;
 import com.example.e_ticket_booking_system.exception.BadRequestException;
 import com.example.e_ticket_booking_system.exception.ForbiddenException;
 import com.example.e_ticket_booking_system.exception.ResourceNotFoundException;
 import com.example.e_ticket_booking_system.repository.EventRepository;
+import com.example.e_ticket_booking_system.repository.SectionRepository;
 import com.example.e_ticket_booking_system.repository.TicketTypeRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class TicketTypeService {
 
     private final TicketTypeRepository ticketTypeRepository;
     private final EventRepository eventRepository;
+    private final SectionRepository sectionRepository;
 
     public TicketTypeResponse createTicketType(Long organizerId, CreateTicketTypeRequest request) {
         // Tìm event theo ID
@@ -47,6 +50,16 @@ public class TicketTypeService {
 
         TicketType ticketType = new TicketType();
         ticketType.setEvent(event);
+
+        // Gắn section nếu có
+        if (request.getSectionId() != null) {
+            Optional<Section> optionalSection = sectionRepository.findById(request.getSectionId());
+            if (!optionalSection.isPresent()) {
+                throw new ResourceNotFoundException("Section not found with id: " + request.getSectionId());
+            }
+            ticketType.setSection(optionalSection.get());
+        }
+
         ticketType.setName(request.getName());
         ticketType.setDescription(request.getDescription());
         ticketType.setPrice(request.getPrice());
@@ -98,9 +111,15 @@ public class TicketTypeService {
     }
 
     private TicketTypeResponse toResponse(TicketType tt) {
+        Long sectionId = null;
+        String sectionName = null;
+        if (tt.getSection() != null) {
+            sectionId = tt.getSection().getId();
+            sectionName = tt.getSection().getName();
+        }
         return new TicketTypeResponse(
-                tt.getId(), tt.getEvent().getId(), tt.getName(),
-                tt.getDescription(), tt.getPrice(), tt.getTotalQuantity(),
-                tt.getAvailableQuantity(), tt.getMaxPerBooking());
+                tt.getId(), tt.getEvent().getId(), sectionId, sectionName,
+                tt.getName(), tt.getDescription(), tt.getPrice(),
+                tt.getTotalQuantity(), tt.getAvailableQuantity(), tt.getMaxPerBooking());
     }
 }

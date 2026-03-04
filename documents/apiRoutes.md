@@ -26,6 +26,8 @@
 11. [Seats & Sections](#11-seats--sections)
 12. [Promo Codes](#12-promo-codes)
 13. [Ticket Listings & Exchanges](#13-ticket-listings--exchanges)
+14. [Transaction Histories](#14-transaction-histories-lịch-sử-giao-dịch)
+15. [Organizer E-Wallet](#15-organizer-e-wallet-ví-điện-tử-organizer)
 
 ---
 
@@ -717,33 +719,113 @@
 ```json
 {
   "bookingId": 1,                      // ✅ Bắt buộc
-  "paymentMethod": "VNPAY"             // ✅ Bắt buộc (VNPAY, MOMO, STRIPE)
+  "paymentMethod": "PAYOS"             // ✅ Bắt buộc (PAYOS)
 }
 ```
 
 ---
 
-### 8.2. Payment callback (xử lý kết quả thanh toán)
-
-| | |
-|---|---|
-| **URL** | `POST /api/payments/callback` |
-| **Mô tả** | Callback từ cổng thanh toán, xác nhận thành công hoặc thất bại. Khi thành công sẽ tự confirm booking, sinh ticket, và tăng `usedCount` của promo code (nếu có). |
-| **Authorization** | ❌ Không cần (gọi từ payment gateway) |
-| **Query Params** | `transactionId` (String) ✅ Bắt buộc |
-| | `success` (boolean) ✅ Bắt buộc — `true` hoặc `false` |
-| **Request Body** | Không có |
-
----
-
-### 8.3. Xem thanh toán theo booking
+### 8.2. Xem thanh toán theo booking
 
 | | |
 |---|---|
 | **URL** | `GET /api/payments/booking/{bookingId}` |
 | **Mô tả** | Lấy thông tin thanh toán của một booking |
 | **Authorization** | ✅ `Bearer <token>` |
-| **Query Param** | `bookingId` (Long) ✅ Bắt buộc |
+| **Path Variable** | `bookingId` — Booking ID |
+| **Request Body** | Không có |
+
+---
+
+### 8.3. Lấy thông tin thanh toán PayOS (đồng bộ trạng thái)
+
+| | |
+|---|---|
+| **URL** | `GET /api/payments/payos/{orderCode}` |
+| **Mô tả** | Lấy thông tin thanh toán từ PayOS và đồng bộ trạng thái. Nếu PayOS báo PAID mà DB chưa SUCCESS → tự động cập nhật. Nếu CANCELLED mà DB còn PENDING → cập nhật CANCELLED |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Path Variable** | `orderCode` — PayOS orderCode (long) |
+| **Request Body** | Không có |
+
+**Response:** `PaymentResponse` (trạng thái được đồng bộ từ PayOS)
+
+---
+
+### 8.4. Hủy thanh toán PayOS
+
+| | |
+|---|---|
+| **URL** | `PUT /api/payments/payos/{orderCode}/cancel` |
+| **Mô tả** | Hủy link thanh toán PayOS. Chỉ hủy được khi Payment status = PENDING |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Path Variable** | `orderCode` — PayOS orderCode (long) |
+| **Request Body** | Không có |
+
+**Lỗi có thể xảy ra:**
+- Payment not found (404)
+- Only pending payments can be cancelled (400)
+- Failed to cancel payment on PayOS (400)
+
+---
+
+### 8.5. PayOS Webhook
+
+| | |
+|---|---|
+| **URL** | `POST /api/payments/payos/webhook` |
+| **Mô tả** | Endpoint nhận webhook từ PayOS khi trạng thái thanh toán thay đổi. PayOS gửi POST tự động |
+| **Authorization** | ❌ Không cần (xác thực bằng PayOS signature) |
+| **Header** | — |
+
+**Request Body (PayOS gửi):**
+```json
+{
+  "code": "00",
+  "desc": "success",
+  "success": true,
+  "data": {
+    "orderCode": 123,
+    "amount": 3000,
+    "description": "DH-BK20260303001",
+    "code": "00",
+    "desc": "Thành công",
+    "reference": "TF230204212323",
+    "transactionDateTime": "2023-02-04 18:25:00",
+    "paymentLinkId": "..."
+  },
+  "signature": "..."
+}
+```
+
+> **Logic xử lý:**
+> - Xác thực webhook signature qua PayOS SDK
+> - `data.code = "00"` → thanh toán thành công → update Payment status = SUCCESS, confirm booking, generate tickets
+> - `data.code != "00"` → thanh toán thất bại → update Payment status = FAILED
+> - Luôn trả về HTTP 200 `{"success": true}` để PayOS không retry liên tục
+
+---
+
+### 8.6. PayOS Return URL (Success Redirect)
+
+| | |
+|---|---|
+| **URL** | `GET /api/payments/payos/success` |
+| **Mô tả** | URL PayOS redirect đến khi user thanh toán xong. Backend trả thông tin payment, frontend xử lý hiển thị |
+| **Authorization** | ❌ Không cần |
+| **Query Params** | `orderCode` (long) ✅ Bắt buộc |
+| | `status` (String, optional) |
+| **Request Body** | Không có |
+
+---
+
+### 8.7. PayOS Cancel URL (Cancel Redirect)
+
+| | |
+|---|---|
+| **URL** | `GET /api/payments/payos/cancel` |
+| **Mô tả** | URL PayOS redirect đến khi user hủy thanh toán trên trang PayOS |
+| **Authorization** | ❌ Không cần |
+| **Query Param** | `orderCode` (long) ✅ Bắt buộc |
 | **Request Body** | Không có |
 
 ---
@@ -1334,82 +1416,363 @@
 
 ---
 
-## Tổng hợp nhanh
+## 14. Transaction Histories (Lịch sử giao dịch)
+
+### 14.1. Lấy lịch sử giao dịch của tôi
+
+| | |
+|---|---|
+| **URL** | `GET /api/transaction-histories/my-transactions` |
+| **Mô tả** | Lấy toàn bộ lịch sử giao dịch của user đang đăng nhập |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Query Params** | `type` (String, optional) — Lọc theo loại: `PAYMENT`, `REFUND`, `EXCHANGE_PAYMENT`, `EXCHANGE_REFUND` |
+| **Request Body** | Không có |
+
+**Response:** `List<TransactionHistoryResponse>`
+```json
+[
+  {
+    "id": 1,
+    "paymentId": 10,
+    "userId": 5,
+    "userFullName": "Nguyen Van A",
+    "transactionType": "PAYMENT",
+    "status": "SUCCESS",
+    "amount": 500000,
+    "description": "Thanh toán thành công booking BK20260303001",
+    "paymentMethod": "PAYOS",
+    "bookingId": 1,
+    "bookingCode": "BK20260303001",
+    "createdAt": "2026-03-03T10:30:00"
+  }
+]
+```
+
+---
+
+### 14.2. Lấy lịch sử giao dịch theo booking
+
+| | |
+|---|---|
+| **URL** | `GET /api/transaction-histories/booking/{bookingId}` |
+| **Mô tả** | Lấy lịch sử giao dịch liên quan đến một booking cụ thể |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Path Variable** | `bookingId` — Booking ID |
+| **Request Body** | Không có |
+
+---
+
+### 14.3. Lấy lịch sử giao dịch theo payment
+
+| | |
+|---|---|
+| **URL** | `GET /api/transaction-histories/payment/{paymentId}` |
+| **Mô tả** | Lấy lịch sử thay đổi trạng thái của một payment |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Path Variable** | `paymentId` — Payment ID |
+| **Request Body** | Không có |
+
+---
+
+### 14.4. [ADMIN] Lấy tất cả lịch sử giao dịch
+
+| | |
+|---|---|
+| **URL** | `GET /api/transaction-histories/admin` |
+| **Mô tả** | Lấy toàn bộ lịch sử giao dịch trong hệ thống |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ADMIN` |
+| **Request Body** | Không có |
+
+---
+
+### 14.5. [ADMIN] Lấy lịch sử giao dịch của user bất kỳ
+
+| | |
+|---|---|
+| **URL** | `GET /api/transaction-histories/admin/user/{userId}` |
+| **Mô tả** | Lấy lịch sử giao dịch của một user cụ thể |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ADMIN` |
+| **Path Variable** | `userId` — User ID |
+| **Request Body** | Không có |
+
+---
+
+## 15. Organizer E-Wallet (Ví điện tử Organizer)
+
+### 15.1. Lấy thông tin ví (Organizer)
+
+| | |
+|---|---|
+| **URL** | `GET /api/organizer/wallet` |
+| **Mô tả** | Lấy thông tin ví của organizer đang đăng nhập. Nếu chưa có ví → tự động tạo mới |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` / `ADMIN` |
+| **Request Body** | Không có |
+
+**Response:** `OrganizerEWalletResponse`
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "id": 1,
+    "userId": 5,
+    "userFullName": "Nguyen Organizer",
+    "balance": 1500000.00,
+    "totalWithdrawn": 500000.00,
+    "bankName": "Vietcombank",
+    "bankAccountNumber": "1234567890",
+    "bankAccountHolder": "NGUYEN VAN A",
+    "createdAt": "2026-03-01T10:00:00",
+    "updatedAt": "2026-03-04T15:30:00"
+  }
+}
+```
+
+---
+
+### 15.2. Cập nhật thông tin ngân hàng (Organizer)
+
+| | |
+|---|---|
+| **URL** | `PUT /api/organizer/wallet/bank-info` |
+| **Mô tả** | Cập nhật thông tin ngân hàng cho ví organizer. Bắt buộc trước khi rút tiền |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` / `ADMIN` |
+
+**Request Body:**
+```json
+{
+  "bankName": "Vietcombank",              // ✅ Bắt buộc
+  "bankAccountNumber": "1234567890",      // ✅ Bắt buộc
+  "bankAccountHolder": "NGUYEN VAN A"     // ✅ Bắt buộc
+}
+```
+
+**Response:** `OrganizerEWalletResponse` (thông tin ví đã cập nhật)
+
+---
+
+### 15.3. Yêu cầu rút tiền (Organizer)
+
+| | |
+|---|---|
+| **URL** | `POST /api/organizer/wallet/withdraw` |
+| **Mô tả** | Rút tiền từ ví organizer về tài khoản ngân hàng |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` / `ADMIN` |
+
+**Request Body:**
+```json
+{
+  "amount": 500000     // ✅ Bắt buộc, tối thiểu 10,000 VND
+}
+```
+
+**Response:** `WalletTransactionResponse`
+```json
+{
+  "success": true,
+  "message": "Withdrawal successful",
+  "data": {
+    "id": 10,
+    "walletId": 1,
+    "transactionType": "WITHDRAWAL",
+    "amount": 500000.00,
+    "balanceAfter": 1000000.00,
+    "description": "Rút tiền về Vietcombank - 1234567890",
+    "referenceCode": null,
+    "status": "SUCCESS",
+    "createdAt": "2026-03-04T16:00:00"
+  }
+}
+```
+
+**Lỗi có thể xảy ra:**
+- Chưa cập nhật thông tin ngân hàng (400)
+- Số dư không đủ (400)
+- Số tiền rút < 10,000 VND (400)
+
+---
+
+### 15.4. Lấy lịch sử giao dịch ví (Organizer)
+
+| | |
+|---|---|
+| **URL** | `GET /api/organizer/wallet/transactions` |
+| **Mô tả** | Lấy lịch sử giao dịch ví của organizer đang đăng nhập |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ORGANIZER` / `ADMIN` |
+| **Query Params** | `type` (String, optional) — Lọc theo loại: `REVENUE`, `WITHDRAWAL`, `REFUND_DEDUCTION` |
+
+**Response:** `List<WalletTransactionResponse>`
+```json
+[
+  {
+    "id": 10,
+    "walletId": 1,
+    "transactionType": "REVENUE",
+    "amount": 500000.00,
+    "balanceAfter": 1500000.00,
+    "description": "Doanh thu từ booking BK20260304001",
+    "referenceCode": "BK20260304001",
+    "status": "SUCCESS",
+    "createdAt": "2026-03-04T14:00:00"
+  },
+  {
+    "id": 9,
+    "walletId": 1,
+    "transactionType": "WITHDRAWAL",
+    "amount": 200000.00,
+    "balanceAfter": 1000000.00,
+    "description": "Rút tiền về Vietcombank - 1234567890",
+    "referenceCode": null,
+    "status": "SUCCESS",
+    "createdAt": "2026-03-03T10:00:00"
+  }
+]
+```
+
+---
+
+### 15.5. [ADMIN] Lấy tất cả ví organizer
+
+| | |
+|---|---|
+| **URL** | `GET /api/organizer/wallet/admin/all` |
+| **Mô tả** | Lấy danh sách tất cả ví organizer trong hệ thống |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ADMIN` |
+| **Request Body** | Không có |
+
+**Response:** `List<OrganizerEWalletResponse>`
+
+---
+
+### 15.6. [ADMIN] Lấy ví của organizer bất kỳ
+
+| | |
+|---|---|
+| **URL** | `GET /api/organizer/wallet/admin/user/{userId}` |
+| **Mô tả** | Lấy thông tin ví của organizer theo userId |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ADMIN` |
+| **Path Variable** | `userId` — User ID của organizer |
+
+**Response:** `OrganizerEWalletResponse`
+
+---
+
+### 15.7. [ADMIN] Lấy lịch sử giao dịch ví của organizer bất kỳ
+
+| | |
+|---|---|
+| **URL** | `GET /api/organizer/wallet/admin/user/{userId}/transactions` |
+| **Mô tả** | Lấy lịch sử giao dịch ví của organizer bất kỳ theo userId |
+| **Authorization** | ✅ `Bearer <token>` |
+| **Role** | 🔒 `ADMIN` |
+| **Path Variable** | `userId` — User ID của organizer |
+
+**Response:** `List<WalletTransactionResponse>`
+
+---
+
+## Tổng hợp nhanh (93 endpoints)
 
 | # | Method | URL | Auth | Role |
 |---|--------|-----|------|------|
 | 1 | POST | `/api/auth/register` | ❌ | — |
-| 2 | POST | `/api/auth/login` | ❌ | — |
-| 3 | POST | `/api/auth/refresh-token` | ❌ | — |
-| 4 | POST | `/api/auth/logout` | ❌ | — |
-| 5 | GET | `/api/users/me` | ✅ | Any |
-| 6 | PUT | `/api/users/me` | ✅ | Any |
-| 7 | PUT | `/api/users/me/password` | ✅ | Any |
-| 8 | GET | `/api/users` | ✅ | ADMIN |
-| 9 | GET | `/api/users/role/{role}` | ✅ | ADMIN |
-| 10 | PUT | `/api/users/{userId}/ban` | ✅ | ADMIN |
-| 11 | PUT | `/api/users/{userId}/unban` | ✅ | ADMIN |
-| 12 | PUT | `/api/users/{userId}/role?role=` | ✅ | ADMIN |
-| 13 | GET | `/api/events` | ❌ | — |
-| 14 | GET | `/api/events/{id}` | ❌ | — |
-| 15 | POST | `/api/events` | ✅ | ORGANIZER/ADMIN |
-| 16 | PUT | `/api/events/{id}` | ✅ | ORGANIZER/ADMIN |
-| 17 | PUT | `/api/events/{id}/publish` | ✅ | ORGANIZER/ADMIN |
-| 18 | PUT | `/api/events/{id}/cancel` | ✅ | ORGANIZER/ADMIN |
-| 19 | GET | `/api/events/my-events` | ✅ | ORGANIZER/ADMIN |
-| 20 | GET | `/api/events/all` | ✅ | ADMIN |
-| 21 | GET | `/api/event-categories` | ❌ | — |
-| 22 | GET | `/api/event-categories/{id}` | ❌ | — |
-| 23 | POST | `/api/event-categories` | ✅ | ADMIN |
-| 24 | PUT | `/api/event-categories/{id}` | ✅ | ADMIN |
-| 25 | DELETE | `/api/event-categories/{id}` | ✅ | ADMIN |
-| 26 | GET | `/api/event-schedules?eventId=` | ❌ | — |
-| 27 | GET | `/api/event-schedules/available?eventId=` | ❌ | — |
-| 28 | GET | `/api/event-schedules/{id}` | ❌ | — |
-| 29 | POST | `/api/event-schedules` | ✅ | ORGANIZER/ADMIN |
-| 30 | PUT | `/api/event-schedules/{id}/cancel` | ✅ | ORGANIZER/ADMIN |
-| 31 | GET | `/api/ticket-types?eventId=` | ❌ | — |
-| 32 | GET | `/api/ticket-types/available?eventId=` | ❌ | — |
-| 33 | GET | `/api/ticket-types/{id}` | ❌ | — |
-| 34 | POST | `/api/ticket-types` | ✅ | ORGANIZER/ADMIN |
-| 35 | POST | `/api/bookings` | ✅ | Any |
-| 36 | DELETE | `/api/bookings/{id}` | ✅ | Any |
-| 37 | GET | `/api/bookings/my-bookings` | ✅ | Any |
-| 38 | GET | `/api/bookings/{id}` | ✅ | Any |
-| 39 | POST | `/api/payments` | ✅ | Any |
-| 40 | POST | `/api/payments/callback?transactionId=&success=` | ❌ | — |
-| 41 | GET | `/api/payments/booking/{bookingId}` | ✅ | Any |
-| 42 | GET | `/api/tickets/my-tickets` | ✅ | Any |
-| 43 | GET | `/api/tickets/booking/{bookingId}` | ✅ | Any |
-| 44 | GET | `/api/tickets/code/{ticketCode}` | ✅ | Any |
-| 45 | POST | `/api/tickets/check-in` | ✅ | STAFF/ORGANIZER/ADMIN |
-| 46 | GET | `/api/venues` | ❌ | — |
-| 47 | GET | `/api/venues/{id}` | ❌ | — |
-| 48 | GET | `/api/venues/search?city=` | ❌ | — |
-| 49 | POST | `/api/venues` | ✅ | ORGANIZER/ADMIN |
-| 50 | PUT | `/api/venues/{id}` | ✅ | ORGANIZER/ADMIN |
-| 51 | POST | `/api/seats/sections` | ✅ | ORGANIZER/ADMIN |
-| 52 | GET | `/api/seats/sections/venue/{venueId}` | ✅ | Any |
-| 53 | POST | `/api/seats` | ✅ | ORGANIZER/ADMIN |
-| 54 | GET | `/api/seats/venue/{venueId}` | ✅ | Any |
-| 55 | GET | `/api/seats/available?scheduleId=` | ✅ | Any |
-| 56 | POST | `/api/promo-codes/admin` | ✅ | ADMIN |
-| 57 | GET | `/api/promo-codes/admin` | ✅ | ADMIN |
-| 58 | GET | `/api/promo-codes/admin/active` | ✅ | ADMIN |
-| 59 | GET | `/api/promo-codes/admin/{id}` | ✅ | ADMIN |
-| 60 | PUT | `/api/promo-codes/admin/{id}` | ✅ | ADMIN |
-| 61 | PUT | `/api/promo-codes/admin/{id}/deactivate` | ✅ | ADMIN |
-| 62 | POST | `/api/promo-codes/organizer` | ✅ | ORGANIZER |
-| 63 | GET | `/api/promo-codes/organizer` | ✅ | ORGANIZER |
-| 64 | GET | `/api/promo-codes/organizer/{id}` | ✅ | ORGANIZER |
-| 65 | PUT | `/api/promo-codes/organizer/{id}` | ✅ | ORGANIZER |
-| 66 | PUT | `/api/promo-codes/organizer/{id}/deactivate` | ✅ | ORGANIZER |
-| 67 | POST | `/api/promo-codes/available` | ✅ | Any (đã đăng nhập) |
-| 68 | GET | `/api/ticket-listings` | ❌ | — |
-| 69 | GET | `/api/ticket-listings/{id}` | ❌ | — |
-| 70 | GET | `/api/ticket-listings/my-listings` | ✅ | Any |
-| 71 | POST | `/api/ticket-listings` | ✅ | Any |
-| 72 | DELETE | `/api/ticket-listings/{id}` | ✅ | Any |
-| 73 | POST | `/api/ticket-listings/exchanges` | ✅ | Any |
-| 74 | PUT | `/api/ticket-listings/exchanges/{id}/complete` | ✅ | Any |
-| 75 | DELETE | `/api/ticket-listings/exchanges/{id}` | ✅ | Any |
+| 2 | POST | `/api/auth/verify-email` | ❌ | — |
+| 3 | POST | `/api/auth/resend-otp` | ❌ | — |
+| 4 | POST | `/api/auth/login` | ❌ | — |
+| 5 | POST | `/api/auth/refresh-token` | ❌ | — |
+| 6 | POST | `/api/auth/logout` | ❌ | — |
+| 7 | GET | `/api/users/me` | ✅ | Any |
+| 8 | PUT | `/api/users/me` | ✅ | Any |
+| 9 | PUT | `/api/users/me/password` | ✅ | Any |
+| 10 | GET | `/api/users` | ✅ | ADMIN |
+| 11 | GET | `/api/users/role/{role}` | ✅ | ADMIN |
+| 12 | PUT | `/api/users/{userId}/ban` | ✅ | ADMIN |
+| 13 | PUT | `/api/users/{userId}/unban` | ✅ | ADMIN |
+| 14 | PUT | `/api/users/{userId}/role?role=` | ✅ | ADMIN |
+| 15 | GET | `/api/events` | ❌ | — |
+| 16 | GET | `/api/events/{id}` | ❌ | — |
+| 17 | POST | `/api/events` | ✅ | ORGANIZER/ADMIN |
+| 18 | PUT | `/api/events/{id}` | ✅ | ORGANIZER/ADMIN |
+| 19 | PUT | `/api/events/{id}/publish` | ✅ | ORGANIZER/ADMIN |
+| 20 | PUT | `/api/events/{id}/cancel` | ✅ | ORGANIZER/ADMIN |
+| 21 | GET | `/api/events/my-events` | ✅ | ORGANIZER/ADMIN |
+| 22 | GET | `/api/events/all` | ✅ | ADMIN |
+| 23 | GET | `/api/event-categories` | ❌ | — |
+| 24 | GET | `/api/event-categories/{id}` | ❌ | — |
+| 25 | POST | `/api/event-categories` | ✅ | ADMIN |
+| 26 | PUT | `/api/event-categories/{id}` | ✅ | ADMIN |
+| 27 | DELETE | `/api/event-categories/{id}` | ✅ | ADMIN |
+| 28 | GET | `/api/event-schedules?eventId=` | ❌ | — |
+| 29 | GET | `/api/event-schedules/available?eventId=` | ❌ | — |
+| 30 | GET | `/api/event-schedules/{id}` | ❌ | — |
+| 31 | POST | `/api/event-schedules` | ✅ | ORGANIZER/ADMIN |
+| 32 | PUT | `/api/event-schedules/{id}/cancel` | ✅ | ORGANIZER/ADMIN |
+| 33 | GET | `/api/ticket-types?eventId=` | ❌ | — |
+| 34 | GET | `/api/ticket-types/available?eventId=` | ❌ | — |
+| 35 | GET | `/api/ticket-types/{id}` | ❌ | — |
+| 36 | POST | `/api/ticket-types` | ✅ | ORGANIZER/ADMIN |
+| 37 | POST | `/api/bookings` | ✅ | Any |
+| 38 | DELETE | `/api/bookings/{id}` | ✅ | Any |
+| 39 | GET | `/api/bookings/my-bookings` | ✅ | Any |
+| 40 | GET | `/api/bookings/{id}` | ✅ | Any |
+| 41 | POST | `/api/payments` | ✅ | Any |
+| 42 | GET | `/api/payments/booking/{bookingId}` | ✅ | Any |
+| 43 | GET | `/api/payments/payos/{orderCode}` | ✅ | Any |
+| 44 | PUT | `/api/payments/payos/{orderCode}/cancel` | ✅ | Any |
+| 45 | POST | `/api/payments/payos/webhook` | ❌ | — |
+| 46 | GET | `/api/payments/payos/success` | ❌ | — |
+| 47 | GET | `/api/payments/payos/cancel` | ❌ | — |
+| 48 | GET | `/api/tickets/my-tickets` | ✅ | Any |
+| 49 | GET | `/api/tickets/booking/{bookingId}` | ✅ | Any |
+| 50 | GET | `/api/tickets/code/{ticketCode}` | ✅ | Any |
+| 51 | POST | `/api/tickets/check-in` | ✅ | STAFF/ORGANIZER/ADMIN |
+| 52 | GET | `/api/venues` | ❌ | — |
+| 53 | GET | `/api/venues/{id}` | ❌ | — |
+| 54 | GET | `/api/venues/search?city=` | ❌ | — |
+| 55 | POST | `/api/venues` | ✅ | ORGANIZER/ADMIN |
+| 56 | PUT | `/api/venues/{id}` | ✅ | ORGANIZER/ADMIN |
+| 57 | POST | `/api/seats/sections` | ✅ | ORGANIZER/ADMIN |
+| 58 | GET | `/api/seats/sections/venue/{venueId}` | ✅ | Any |
+| 59 | POST | `/api/seats` | ✅ | ORGANIZER/ADMIN |
+| 60 | GET | `/api/seats/venue/{venueId}` | ✅ | Any |
+| 61 | GET | `/api/seats/available?scheduleId=` | ✅ | Any |
+| 62 | POST | `/api/promo-codes/admin` | ✅ | ADMIN |
+| 63 | GET | `/api/promo-codes/admin` | ✅ | ADMIN |
+| 64 | GET | `/api/promo-codes/admin/active` | ✅ | ADMIN |
+| 65 | GET | `/api/promo-codes/admin/{id}` | ✅ | ADMIN |
+| 66 | PUT | `/api/promo-codes/admin/{id}` | ✅ | ADMIN |
+| 67 | PUT | `/api/promo-codes/admin/{id}/deactivate` | ✅ | ADMIN |
+| 68 | POST | `/api/promo-codes/organizer` | ✅ | ORGANIZER |
+| 69 | GET | `/api/promo-codes/organizer` | ✅ | ORGANIZER |
+| 70 | GET | `/api/promo-codes/organizer/{id}` | ✅ | ORGANIZER |
+| 71 | PUT | `/api/promo-codes/organizer/{id}` | ✅ | ORGANIZER |
+| 72 | PUT | `/api/promo-codes/organizer/{id}/deactivate` | ✅ | ORGANIZER |
+| 73 | POST | `/api/promo-codes/available` | ✅ | Any (đã đăng nhập) |
+| 74 | GET | `/api/ticket-listings` | ❌ | — |
+| 75 | GET | `/api/ticket-listings/{id}` | ❌ | — |
+| 76 | GET | `/api/ticket-listings/my-listings` | ✅ | Any |
+| 77 | POST | `/api/ticket-listings` | ✅ | Any |
+| 78 | DELETE | `/api/ticket-listings/{id}` | ✅ | Any |
+| 79 | POST | `/api/ticket-listings/exchanges` | ✅ | Any |
+| 80 | PUT | `/api/ticket-listings/exchanges/{id}/complete` | ✅ | Any |
+| 81 | DELETE | `/api/ticket-listings/exchanges/{id}` | ✅ | Any |
+| 82 | GET | `/api/transaction-histories/my-transactions` | ✅ | Any |
+| 83 | GET | `/api/transaction-histories/booking/{bookingId}` | ✅ | Any |
+| 84 | GET | `/api/transaction-histories/payment/{paymentId}` | ✅ | Any |
+| 85 | GET | `/api/transaction-histories/admin` | ✅ | ADMIN |
+| 86 | GET | `/api/transaction-histories/admin/user/{userId}` | ✅ | ADMIN |
+| 87 | GET | `/api/organizer/wallet` | ✅ | ORGANIZER/ADMIN |
+| 88 | PUT | `/api/organizer/wallet/bank-info` | ✅ | ORGANIZER/ADMIN |
+| 89 | POST | `/api/organizer/wallet/withdraw` | ✅ | ORGANIZER/ADMIN |
+| 90 | GET | `/api/organizer/wallet/transactions` | ✅ | ORGANIZER/ADMIN |
+| 91 | GET | `/api/organizer/wallet/admin/all` | ✅ | ADMIN |
+| 92 | GET | `/api/organizer/wallet/admin/user/{userId}` | ✅ | ADMIN |
+| 93 | GET | `/api/organizer/wallet/admin/user/{userId}/transactions` | ✅ | ADMIN |

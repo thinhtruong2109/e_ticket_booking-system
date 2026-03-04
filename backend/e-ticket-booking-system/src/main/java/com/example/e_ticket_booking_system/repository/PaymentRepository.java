@@ -8,5 +8,5 @@ import com.example.e_ticket_booking_system.entity.Payment;
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Payment findByBookingId(Long bookingId);
-    Payment findByTransactionId(String transactionId);
+    Payment findByPayosOrderCode(Long payosOrderCode);
 }

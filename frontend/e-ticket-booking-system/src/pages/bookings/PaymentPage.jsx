@@ -73,11 +73,13 @@ const PaymentPage = () => {
         paymentMethod,
       });
 
-      // If payment URL returned (e.g., VNPay redirect)
-      if (res.data?.paymentUrl) {
+      // If PayOS checkout URL returned, redirect to PayOS
+      if (res.data?.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+      } else if (res.data?.paymentUrl) {
         window.location.href = res.data.paymentUrl;
       } else {
-        // For demo: simulate callback
+        // Fallback: navigate to booking detail
         navigate(`/bookings/${bookingId}`, { state: { paymentSuccess: true } });
       }
     } catch (err) {

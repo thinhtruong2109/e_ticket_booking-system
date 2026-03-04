@@ -10,16 +10,14 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PaymentResponse {
+public class WalletTransactionResponse {
     private Long id;
-    private Long bookingId;
-    private String bookingCode;
-    private String paymentMethod;
+    private Long walletId;
+    private String transactionType;
     private BigDecimal amount;
+    private BigDecimal balanceAfter;
+    private String description;
+    private String referenceCode;
     private String status;
-    private Long payosOrderCode;
-    private String checkoutUrl;
-    private String paymentLinkId;
-    private LocalDateTime paidAt;
     private LocalDateTime createdAt;
 }

@@ -10,16 +10,17 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class PaymentResponse {
+public class TransactionHistoryResponse {
     private Long id;
+    private Long paymentId;
+    private Long userId;
+    private String userFullName;
+    private String transactionType;
+    private String status;
+    private BigDecimal amount;
+    private String description;
+    private String paymentMethod;
     private Long bookingId;
     private String bookingCode;
-    private String paymentMethod;
-    private BigDecimal amount;
-    private String status;
-    private Long payosOrderCode;
-    private String checkoutUrl;
-    private String paymentLinkId;
-    private LocalDateTime paidAt;
     private LocalDateTime createdAt;
 }

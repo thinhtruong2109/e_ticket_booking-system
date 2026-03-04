@@ -34,6 +34,11 @@ public class TicketType {
                 foreignKey = @ForeignKey(name = "fk_ticket_types_event_id"))
     private Event event;
     
+    @ManyToOne
+    @JoinColumn(name = "section_id",
+                foreignKey = @ForeignKey(name = "fk_ticket_types_section_id"))
+    private Section section;
+    
     @Column(name = "name", nullable = false, length = 100)
     private String name; // VIP, Regular, Early Bird
     

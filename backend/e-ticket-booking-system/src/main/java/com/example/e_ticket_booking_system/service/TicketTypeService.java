@@ -1,7 +1,9 @@
+
 package com.example.e_ticket_booking_system.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -9,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.example.e_ticket_booking_system.dto.request.CreateTicketTypeRequest;
+import com.example.e_ticket_booking_system.dto.request.UpdateTicketTypeRequest;
 import com.example.e_ticket_booking_system.dto.response.TicketTypeResponse;
 import com.example.e_ticket_booking_system.entity.Event;
 import com.example.e_ticket_booking_system.entity.Section;
@@ -26,6 +29,88 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class TicketTypeService {
+    public TicketTypeResponse updateTicketType(Long organizerId, UpdateTicketTypeRequest request) {
+        Optional<TicketType> optionalTicketType = ticketTypeRepository.findById(request.getId());
+        if (!optionalTicketType.isPresent()) {
+            throw new ResourceNotFoundException("Ticket type not found with id: " + request.getId());
+        }
+        TicketType ticketType = optionalTicketType.get();
+        Event event = ticketType.getEvent();
+        if (!event.getOrganizer().getId().equals(organizerId)) {
+            throw new ForbiddenException("You don't have permission to update ticket types for this event");
+        }
+        // Validate name uniqueness (except self)
+        TicketType existing = ticketTypeRepository.findByEventIdAndName(request.getEventId(), request.getName());
+        if (existing != null && !existing.getId().equals(ticketType.getId())) {
+            throw new BadRequestException("Ticket type with name '" + request.getName() + "' already exists for this event");
+        }
+        // Validate: sum of all ticket types' totalQuantity (except self) + new must not exceed event.totalTickets
+        int currentTotalQuantity = ticketTypeRepository.sumTotalQuantityByEventId(request.getEventId()) - ticketType.getTotalQuantity();
+        if (event.getTotalTickets() > 0 && currentTotalQuantity + request.getTotalQuantity() > event.getTotalTickets()) {
+            throw new BadRequestException(
+                    "Total ticket type quantity (" + (currentTotalQuantity + request.getTotalQuantity())
+                            + ") would exceed event total tickets (" + event.getTotalTickets()
+                            + "). Current ticket types use " + currentTotalQuantity + " tickets");
+        }
+        // Gắn section nếu có
+        if (request.getSectionId() != null) {
+            Optional<Section> optionalSection = sectionRepository.findById(request.getSectionId());
+            if (!optionalSection.isPresent()) {
+                throw new ResourceNotFoundException("Section not found with id: " + request.getSectionId());
+            }
+            Section section = optionalSection.get();
+            if (section.getCapacity() != null && request.getTotalQuantity() > section.getCapacity()) {
+                throw new BadRequestException(
+                        "Total quantity (" + request.getTotalQuantity()
+                                + ") exceeds section '" + section.getName()
+                                + "' capacity (" + section.getCapacity() + ")");
+            }
+            if (Boolean.TRUE.equals(section.getHasNumberedSeats())) {
+                long seatCount = seatRepository.countBySectionId(section.getId());
+                if (seatCount == 0) {
+                    throw new BadRequestException(
+                            "Section '" + section.getName()
+                                    + "' has numbered seats enabled but no seats have been created yet. "
+                                    + "Please create seats first before updating ticket types");
+                }
+                if (request.getTotalQuantity() > seatCount) {
+                    throw new BadRequestException(
+                            "Total quantity (" + request.getTotalQuantity()
+                                    + ") exceeds the number of actual seats (" + seatCount
+                                    + ") in section '" + section.getName()
+                                    + "'. For numbered seat sections, ticket quantity cannot exceed seat count");
+                }
+            }
+            ticketType.setSection(section);
+        } else {
+            ticketType.setSection(null);
+        }
+        ticketType.setName(request.getName());
+        ticketType.setDescription(request.getDescription());
+        ticketType.setPrice(request.getPrice());
+        // Nếu tăng tổng số lượng, tăng availableQuantity tương ứng
+        int diff = request.getTotalQuantity() - ticketType.getTotalQuantity();
+        ticketType.setTotalQuantity(request.getTotalQuantity());
+        ticketType.setAvailableQuantity(ticketType.getAvailableQuantity() + diff);
+        ticketType.setMaxPerBooking(Objects.requireNonNullElse(request.getMaxPerBooking(), 10));
+        ticketType = ticketTypeRepository.save(ticketType);
+        log.info("Ticket type updated: {} for event: {}", ticketType.getName(), event.getName());
+        return toResponse(ticketType);
+    }
+
+    public void deleteTicketType(Long organizerId, Long ticketTypeId) {
+        Optional<TicketType> optionalTicketType = ticketTypeRepository.findById(ticketTypeId);
+        if (!optionalTicketType.isPresent()) {
+            throw new ResourceNotFoundException("Ticket type not found with id: " + ticketTypeId);
+        }
+        TicketType ticketType = optionalTicketType.get();
+        Event event = ticketType.getEvent();
+        if (!event.getOrganizer().getId().equals(organizerId)) {
+            throw new ForbiddenException("You don't have permission to delete ticket types for this event");
+        }
+        ticketTypeRepository.delete(ticketType);
+        log.info("Ticket type deleted: {} for event: {}", ticketType.getName(), event.getName());
+    }
 
     private static final Logger log = LoggerFactory.getLogger(TicketTypeService.class);
 

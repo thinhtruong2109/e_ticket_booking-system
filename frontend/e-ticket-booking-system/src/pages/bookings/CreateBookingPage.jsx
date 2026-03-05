@@ -101,16 +101,36 @@ const CreateBookingPage = () => {
     }, 0);
   }, [ticketTypes, quantities]);
 
-  // Get allowed section IDs from selected ticket types (for seat filtering)
-  const allowedSectionIds = useMemo(() => {
-    const ids = [];
+  // Build per-section seat requirements: { sectionId: { sectionName, required } }
+  const seatRequirementsBySection = useMemo(() => {
+    const map = {};
     ticketTypes.forEach((tt) => {
-      if ((quantities[tt.id] || 0) > 0 && tt.sectionId && tt.hasNumberedSeats) {
-        if (!ids.includes(tt.sectionId)) ids.push(tt.sectionId);
+      if ((quantities[tt.id] || 0) > 0 && tt.hasNumberedSeats && tt.sectionId) {
+        if (!map[tt.sectionId]) {
+          map[tt.sectionId] = { sectionName: tt.sectionName, required: 0 };
+        }
+        map[tt.sectionId].required += (quantities[tt.id] || 0);
       }
     });
-    return ids;
+    return map;
   }, [ticketTypes, quantities]);
+
+  // Get allowed section IDs from selected ticket types (for seat filtering)
+  const allowedSectionIds = useMemo(() => {
+    return Object.keys(seatRequirementsBySection).map(Number);
+  }, [seatRequirementsBySection]);
+
+  // Count selected seats per section
+  const selectedSeatsBySection = useMemo(() => {
+    const map = {};
+    for (const seatId of selectedSeatIds) {
+      const seat = availableSeats.find((s) => s.id === seatId);
+      if (seat && seat.sectionId) {
+        map[seat.sectionId] = (map[seat.sectionId] || 0) + 1;
+      }
+    }
+    return map;
+  }, [selectedSeatIds, availableSeats]);
 
   // Fetch available seats when schedule is selected and seats are needed
   useEffect(() => {
@@ -166,11 +186,26 @@ const CreateBookingPage = () => {
   }, [filteredSeats]);
 
   const handleSeatToggle = (seatId) => {
+    const seat = filteredSeats.find((s) => s.id === seatId);
+    if (!seat) return;
+
     setSelectedSeatIds((prev) => {
+      // Deselect
       if (prev.includes(seatId)) {
         return prev.filter((id) => id !== seatId);
       }
+      // Check global limit
       if (prev.length >= requiredSeatCount) return prev;
+      // Check per-section limit
+      if (seat.sectionId && seatRequirementsBySection[seat.sectionId]) {
+        const currentInSection = prev.filter((id) => {
+          const s = availableSeats.find((x) => x.id === id);
+          return s && s.sectionId === seat.sectionId;
+        }).length;
+        if (currentInSection >= seatRequirementsBySection[seat.sectionId].required) {
+          return prev; // Section limit reached
+        }
+      }
       return [...prev, seatId];
     });
   };
@@ -210,13 +245,23 @@ const CreateBookingPage = () => {
       setError('Please select at least one ticket');
       return;
     }
+    if (requiresSeats && !selectedSchedule) {
+      setError('Please select a schedule for seat-based tickets');
+      return;
+    }
     if (requiresSeats && selectedSeatIds.length !== requiredSeatCount) {
       setError(`Please select ${requiredSeatCount} seat(s). Currently selected: ${selectedSeatIds.length}`);
       return;
     }
-    if (requiresSeats && !selectedSchedule) {
-      setError('Please select a schedule for seat-based tickets');
-      return;
+    // Validate per-section seat counts match ticket type requirements
+    if (requiresSeats) {
+      for (const [sectionId, req] of Object.entries(seatRequirementsBySection)) {
+        const selected = selectedSeatsBySection[Number(sectionId)] || 0;
+        if (selected !== req.required) {
+          setError(`Section "${req.sectionName}" requires ${req.required} seat(s), but ${selected} selected`);
+          return;
+        }
+      }
     }
     setError('');
     setSubmitting(true);
@@ -375,34 +420,63 @@ const CreateBookingPage = () => {
                 ) : filteredSeats.length === 0 ? (
                   <Alert severity="warning">No seats available for this schedule</Alert>
                 ) : (
-                  Object.entries(seatsBySection).map(([sectionName, rows]) => (
-                    <Box key={sectionName} sx={{ mb: 3 }}>
-                      <Typography variant="subtitle2" fontWeight={600} color="text.secondary" sx={{ mb: 1 }}>
-                        {sectionName}
-                      </Typography>
-                      {Object.entries(rows).map(([rowLabel, seats]) => (
-                        <Box key={rowLabel} sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 0.5 }}>
-                          <Typography
-                            variant="caption"
-                            fontWeight={600}
-                            sx={{ minWidth: 28, textAlign: 'center', color: 'text.secondary' }}
-                          >
-                            {rowLabel}
-                          </Typography>
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {seats.map((seat) => {
-                              const isSelected = selectedSeatIds.includes(seat.id);
-                              const isDisabled = !seat.available;
-                              const isFull = !isSelected && selectedSeatIds.length >= requiredSeatCount;
-                              return (
-                                <Button
-                                  key={seat.id}
-                                  size="small"
-                                  variant={isSelected ? 'contained' : 'outlined'}
-                                  disabled={isDisabled || isFull}
-                                  onClick={() => handleSeatToggle(seat.id)}
-                                  sx={{
-                                    minWidth: 36,
+                  <>
+                    {/* Per-section selection requirements */}
+                    {Object.keys(seatRequirementsBySection).length > 1 && (
+                      <Alert severity="info" sx={{ mb: 2 }}>
+                        Select seats from each section matching your ticket types.
+                      </Alert>
+                    )}
+                    {Object.entries(seatsBySection).map(([sectionName, rows]) => {
+                      // Find matching section requirement
+                      const sectionEntry = Object.entries(seatRequirementsBySection).find(
+                        ([, val]) => val.sectionName === sectionName
+                      );
+                      const sectionId = sectionEntry ? Number(sectionEntry[0]) : null;
+                      const sectionReq = sectionEntry ? sectionEntry[1].required : 0;
+                      const sectionSelected = sectionId ? (selectedSeatsBySection[sectionId] || 0) : 0;
+                      const sectionFull = sectionReq > 0 && sectionSelected >= sectionReq;
+
+                      return (
+                        <Box key={sectionName} sx={{ mb: 3 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                            <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
+                              {sectionName}
+                            </Typography>
+                            {sectionReq > 0 && (
+                              <Chip
+                                label={`${sectionSelected} / ${sectionReq} seats`}
+                                size="small"
+                                color={sectionSelected === sectionReq ? 'success' : 'default'}
+                                variant="outlined"
+                              />
+                            )}
+                          </Box>
+                          {Object.entries(rows).map(([rowLabel, seats]) => (
+                            <Box key={rowLabel} sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 0.5 }}>
+                              <Typography
+                                variant="caption"
+                                fontWeight={600}
+                                sx={{ minWidth: 28, textAlign: 'center', color: 'text.secondary' }}
+                              >
+                                {rowLabel}
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                {seats.map((seat) => {
+                                  const isSelected = selectedSeatIds.includes(seat.id);
+                                  const isDisabled = !seat.available;
+                                  // Disable if this section's quota is full (unless deselecting)
+                                  const isSectionFull = !isSelected && sectionFull;
+                                  const isGlobalFull = !isSelected && selectedSeatIds.length >= requiredSeatCount;
+                                  return (
+                                    <Button
+                                      key={seat.id}
+                                      size="small"
+                                      variant={isSelected ? 'contained' : 'outlined'}
+                                      disabled={isDisabled || isSectionFull || isGlobalFull}
+                                      onClick={() => handleSeatToggle(seat.id)}
+                                      sx={{
+                                        minWidth: 36,
                                     height: 32,
                                     p: 0,
                                     fontSize: '0.7rem',
@@ -426,7 +500,9 @@ const CreateBookingPage = () => {
                         </Box>
                       ))}
                     </Box>
-                  ))
+                      );
+                    })}
+                  </>
                 )}
 
                 {/* Seat legend */}

@@ -90,6 +90,59 @@ public class SeatService {
         return responseList;
     }
 
+    public SectionResponse updateSection(Long id, CreateSectionRequest request) {
+        Section section = sectionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found with id: " + id));
+
+        if (request.getName() != null) {
+            // Check duplicate name (excluding self)
+            Section existing = sectionRepository.findByVenueIdAndName(section.getVenue().getId(), request.getName());
+            if (existing != null && !existing.getId().equals(id)) {
+                throw new BadRequestException("Section with name '" + request.getName()
+                        + "' already exists in this venue");
+            }
+            section.setName(request.getName());
+        }
+        if (request.getCapacity() != null) {
+            // Validate capacity against venue total
+            Venue venue = section.getVenue();
+            if (venue.getTotalCapacity() != null) {
+                int currentTotal = sectionRepository.sumCapacityByVenueId(venue.getId());
+                Integer reqCap = request.getCapacity();
+                Integer secCap = section.getCapacity();
+                int newCap = reqCap != null ? reqCap : 0;
+                int oldCap = secCap != null ? secCap : 0;
+                int diff = newCap - oldCap;
+                if (currentTotal + diff > venue.getTotalCapacity()) {
+                    throw new BadRequestException(
+                            "Total section capacity would exceed venue total capacity (" + venue.getTotalCapacity() + ")");
+                }
+            }
+            section.setCapacity(request.getCapacity());
+        }
+        if (request.getDescription() != null) section.setDescription(request.getDescription());
+        if (request.getHasNumberedSeats() != null) section.setHasNumberedSeats(request.getHasNumberedSeats());
+
+        section = sectionRepository.save(section);
+        log.info("Section updated: {}", section.getName());
+        return toSectionResponse(section);
+    }
+
+    public void deleteSection(Long id) {
+        Section section = sectionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found with id: " + id));
+
+        // Delete all seats in this section first
+        List<Seat> seats = seatRepository.findBySectionId(id);
+        if (!seats.isEmpty()) {
+            seatRepository.deleteAll(seats);
+            log.info("Deleted {} seats from section: {}", seats.size(), section.getName());
+        }
+
+        sectionRepository.delete(section);
+        log.info("Section deleted: {}", section.getName());
+    }
+
     // Seat methods
     public SeatResponse createSeat(CreateSeatRequest request) {
         Optional<Venue> optionalVenue = venueRepository.findById(request.getVenueId());

@@ -28,6 +28,7 @@ import {
   QrCodeScanner,
   Home,
   Logout,
+  Place,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { getRoleLabel } from '../../utils/helpers';
@@ -37,6 +38,7 @@ const DRAWER_WIDTH = 260;
 const navItems = [
   { label: 'Dashboard', path: '/organizer/dashboard', icon: <Dashboard /> },
   { label: 'My Events', path: '/organizer/events', icon: <Event /> },
+  { label: 'Venues', path: '/organizer/venues', icon: <Place /> },
   { label: 'Promo Codes', path: '/organizer/promo-codes', icon: <LocalOffer /> },
   { label: 'Wallet', path: '/organizer/wallet', icon: <AccountBalanceWallet /> },
   { label: 'Check-in', path: '/organizer/checkin', icon: <QrCodeScanner /> },

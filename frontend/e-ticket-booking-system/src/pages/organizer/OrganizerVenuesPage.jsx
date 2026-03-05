@@ -30,7 +30,7 @@ import { venueApi, seatApi } from '../../api';
 import { LoadingScreen } from '../../components/common';
 import { getErrorMessage } from '../../utils/helpers';
 
-const AdminVenuesPage = () => {
+const OrganizerVenuesPage = () => {
   const { enqueueSnackbar } = useSnackbar();
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,9 +56,14 @@ const AdminVenuesPage = () => {
   const [seatForm, setSeatForm] = useState({
     venueId: '',
     sectionId: '',
-    seatType: 'REGULAR',
     rows: [{ rowLabel: 'A', startNumber: 1, endNumber: 20, seatType: 'REGULAR' }],
   });
+
+  // Seats view
+  const [seatsDialog, setSeatsDialog] = useState(false);
+  const [seats, setSeats] = useState([]);
+  const [seatsLoading, setSeatsLoading] = useState(false);
+  const [viewingVenueName, setViewingVenueName] = useState('');
 
   const fetchVenues = async () => {
     try {
@@ -92,7 +97,7 @@ const AdminVenuesPage = () => {
   };
 
   const handleDeleteVenue = async (id) => {
-    if (!window.confirm('Delete this venue and all its sections/seats?')) return;
+    if (!window.confirm('Are you sure you want to delete this venue and all its sections/seats?')) return;
     try {
       await venueApi.delete(id);
       enqueueSnackbar('Venue deleted', { variant: 'success' });
@@ -172,10 +177,24 @@ const AdminVenuesPage = () => {
   const handleBulkCreateSeats = async () => {
     try {
       await seatApi.bulkCreate(seatForm);
-      enqueueSnackbar('Seats created', { variant: 'success' });
+      enqueueSnackbar('Seats created successfully', { variant: 'success' });
       setSeatDialog(false);
     } catch (err) {
       enqueueSnackbar(getErrorMessage(err), { variant: 'error' });
+    }
+  };
+
+  const handleViewSeats = async (venue) => {
+    setViewingVenueName(venue.name);
+    setSeatsLoading(true);
+    setSeatsDialog(true);
+    try {
+      const res = await seatApi.getSeatsByVenue(venue.id);
+      setSeats(res.data || []);
+    } catch (err) {
+      enqueueSnackbar(getErrorMessage(err), { variant: 'error' });
+    } finally {
+      setSeatsLoading(false);
     }
   };
 
@@ -188,6 +207,14 @@ const AdminVenuesPage = () => {
   const resetVenueForm = () => {
     setEditingId(null);
     setVenueForm({ name: '', address: '', city: '', country: '', totalCapacity: '' });
+  };
+
+  const openSeatDialog = (venue) => {
+    setSeatForm({ venueId: venue.id, sectionId: '', rows: [{ rowLabel: 'A', startNumber: 1, endNumber: 20, seatType: 'REGULAR' }] });
+    if (expandedVenue !== venue.id) {
+      toggleExpand(venue.id);
+    }
+    setSeatDialog(true);
   };
 
   const addRow = () => {
@@ -244,10 +271,14 @@ const AdminVenuesPage = () => {
                   <TableCell>{v.city || '-'}</TableCell>
                   <TableCell>{v.totalCapacity || '-'}</TableCell>
                   <TableCell align="right">
-                    <Tooltip title="Edit"><IconButton size="small" onClick={() => openEditVenue(v)}><Edit fontSize="small" /></IconButton></Tooltip>
-                    <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleDeleteVenue(v.id)}><Delete fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Edit">
+                      <IconButton size="small" onClick={() => openEditVenue(v)}><Edit fontSize="small" /></IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton size="small" color="error" onClick={() => handleDeleteVenue(v.id)}><Delete fontSize="small" /></IconButton>
+                    </Tooltip>
                     <Tooltip title="Add Seats">
-                      <IconButton size="small" color="info" onClick={() => { setSeatForm({ ...seatForm, venueId: v.id }); toggleExpand(v.id); setSeatDialog(true); }}>
+                      <IconButton size="small" color="info" onClick={() => openSeatDialog(v)}>
                         <Chair fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -259,9 +290,14 @@ const AdminVenuesPage = () => {
                       <Box sx={{ p: 2, bgcolor: 'grey.50' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                           <Typography variant="subtitle2" fontWeight={600}>Sections</Typography>
-                          <Button size="small" startIcon={<Add />} onClick={() => { setSelectedVenueId(v.id); resetSectionForm(); setSectionDialog(true); }}>
-                            Add Section
-                          </Button>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button size="small" variant="outlined" onClick={() => handleViewSeats(v)}>
+                              View Seats
+                            </Button>
+                            <Button size="small" startIcon={<Add />} onClick={() => { setSelectedVenueId(v.id); resetSectionForm(); setSectionDialog(true); }}>
+                              Add Section
+                            </Button>
+                          </Box>
                         </Box>
                         {sectionsLoading ? (
                           <Typography variant="body2" color="text.secondary">Loading...</Typography>
@@ -296,7 +332,7 @@ const AdminVenuesPage = () => {
                             </TableBody>
                           </Table>
                         ) : (
-                          <Typography variant="body2" color="text.secondary">No sections</Typography>
+                          <Typography variant="body2" color="text.secondary">No sections yet. Add a section to start organizing seats.</Typography>
                         )}
                       </Box>
                     </Collapse>
@@ -305,7 +341,7 @@ const AdminVenuesPage = () => {
               </Box>
             ))}
             {venues.length === 0 && (
-              <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>No venues</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>No venues yet. Create your first venue to get started.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -366,11 +402,11 @@ const AdminVenuesPage = () => {
             </FormControl>
             <Typography variant="subtitle2" fontWeight={600}>Rows:</Typography>
             {seatForm.rows.map((row, idx) => (
-              <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
                 <TextField label="Row" value={row.rowLabel} onChange={(e) => updateRow(idx, 'rowLabel', e.target.value)} sx={{ width: 80 }} />
-                <TextField label="From" type="number" value={row.startNumber} onChange={(e) => updateRow(idx, 'startNumber', parseInt(e.target.value))} sx={{ width: 80 }} />
-                <TextField label="To" type="number" value={row.endNumber} onChange={(e) => updateRow(idx, 'endNumber', parseInt(e.target.value))} sx={{ width: 80 }} />
-                <FormControl sx={{ width: 120 }}>
+                <TextField label="From" type="number" value={row.startNumber} onChange={(e) => updateRow(idx, 'startNumber', parseInt(e.target.value) || 0)} sx={{ width: 80 }} />
+                <TextField label="To" type="number" value={row.endNumber} onChange={(e) => updateRow(idx, 'endNumber', parseInt(e.target.value) || 0)} sx={{ width: 80 }} />
+                <FormControl sx={{ width: 130 }}>
                   <InputLabel>Type</InputLabel>
                   <Select value={row.seatType} label="Type" onChange={(e) => updateRow(idx, 'seatType', e.target.value)}>
                     <MenuItem value="VIP">VIP</MenuItem>
@@ -391,8 +427,53 @@ const AdminVenuesPage = () => {
           <Button variant="contained" onClick={handleBulkCreateSeats} disabled={!seatForm.sectionId}>Create Seats</Button>
         </DialogActions>
       </Dialog>
+
+      {/* View Seats Dialog */}
+      <Dialog open={seatsDialog} onClose={() => setSeatsDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Seats — {viewingVenueName}</DialogTitle>
+        <DialogContent>
+          {seatsLoading ? (
+            <Typography color="text.secondary" sx={{ py: 2 }}>Loading seats...</Typography>
+          ) : seats.length > 0 ? (
+            <TableContainer sx={{ mt: 1 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Row</TableCell>
+                    <TableCell>Number</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Section</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {seats.map((seat) => (
+                    <TableRow key={seat.id}>
+                      <TableCell>{seat.rowNumber || '-'}</TableCell>
+                      <TableCell>{seat.seatNumber || '-'}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={seat.seatType}
+                          size="small"
+                          color={seat.seatType === 'VIP' ? 'warning' : seat.seatType === 'WHEELCHAIR' ? 'info' : 'default'}
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>{seat.sectionName || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Typography color="text.secondary" sx={{ py: 2 }}>No seats created yet for this venue.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSeatsDialog(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
 
-export default AdminVenuesPage;
+export default OrganizerVenuesPage;

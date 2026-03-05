@@ -34,6 +34,7 @@ import EventFormPage from './pages/organizer/EventFormPage';
 import OrganizerPromoCodesPage from './pages/organizer/OrganizerPromoCodesPage';
 import OrganizerWalletPage from './pages/organizer/OrganizerWalletPage';
 import OrganizerCheckinPage from './pages/organizer/OrganizerCheckinPage';
+import OrganizerVenuesPage from './pages/organizer/OrganizerVenuesPage';
 
 // Admin pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -92,6 +93,7 @@ function App() {
                   <Route path="/organizer/events" element={<OrganizerEventsPage />} />
                   <Route path="/organizer/events/create" element={<EventFormPage />} />
                   <Route path="/organizer/events/:id/edit" element={<EventFormPage />} />
+                  <Route path="/organizer/venues" element={<OrganizerVenuesPage />} />
                   <Route path="/organizer/promo-codes" element={<OrganizerPromoCodesPage />} />
                   <Route path="/organizer/wallet" element={<OrganizerWalletPage />} />
                   <Route path="/organizer/checkin" element={<OrganizerCheckinPage />} />

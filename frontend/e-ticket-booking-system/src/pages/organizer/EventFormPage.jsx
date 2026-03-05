@@ -29,10 +29,11 @@ import {
   IconButton,
   Tooltip,
   Alert,
+  Chip,
 } from '@mui/material';
 import { Add, Delete } from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
-import { eventApi, categoryApi, venueApi, scheduleApi, ticketTypeApi } from '../../api';
+import { eventApi, categoryApi, venueApi, scheduleApi, ticketTypeApi, seatApi } from '../../api';
 import { LoadingScreen, StatusChip } from '../../components/common';
 import { formatDateTime, formatCurrency, getErrorMessage } from '../../utils/helpers';
 
@@ -51,6 +52,7 @@ const EventFormPage = () => {
   const [venues, setVenues] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [ticketTypes, setTicketTypes] = useState([]);
+  const [sections, setSections] = useState([]);
   const [eventId, setEventId] = useState(id ? parseInt(id) : null);
 
   // Form state
@@ -102,6 +104,14 @@ const EventFormPage = () => {
           });
           setSchedules(schedRes.data || []);
           setTicketTypes(ttRes.data || []);
+
+          // Fetch sections for the venue
+          if (event.venue?.id) {
+            try {
+              const secRes = await seatApi.getSectionsByVenue(event.venue.id);
+              setSections(secRes.data || []);
+            } catch { /* venue may have no sections */ }
+          }
         }
       } catch (err) {
         enqueueSnackbar(getErrorMessage(err), { variant: 'error' });
@@ -111,6 +121,17 @@ const EventFormPage = () => {
     };
     fetchData();
   }, [id]);
+
+  // Fetch sections when venue changes
+  useEffect(() => {
+    if (form.venueId) {
+      seatApi.getSectionsByVenue(form.venueId)
+        .then((res) => setSections(res.data || []))
+        .catch(() => setSections([]));
+    } else {
+      setSections([]);
+    }
+  }, [form.venueId]);
 
   const handleSaveEvent = async () => {
     setSaving(true);
@@ -369,6 +390,7 @@ const EventFormPage = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Name</TableCell>
+                  <TableCell>Section</TableCell>
                   <TableCell>Price</TableCell>
                   <TableCell>Total Qty</TableCell>
                   <TableCell>Available</TableCell>
@@ -379,6 +401,13 @@ const EventFormPage = () => {
                 {ticketTypes.map((tt) => (
                   <TableRow key={tt.id}>
                     <TableCell>{tt.name}</TableCell>
+                    <TableCell>
+                      {tt.sectionName ? (
+                        <Chip label={tt.sectionName} size="small" variant="outlined" color={tt.hasNumberedSeats ? 'info' : 'default'} />
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">None (General)</Typography>
+                      )}
+                    </TableCell>
                     <TableCell>{formatCurrency(tt.price)}</TableCell>
                     <TableCell>{tt.totalQuantity}</TableCell>
                     <TableCell>{tt.availableQuantity}</TableCell>
@@ -387,7 +416,7 @@ const EventFormPage = () => {
                 ))}
                 {ticketTypes.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                    <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
                       No ticket types added yet
                     </TableCell>
                   </TableRow>
@@ -419,6 +448,35 @@ const EventFormPage = () => {
                   onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })}
                   fullWidth
                 />
+                <FormControl fullWidth>
+                  <InputLabel>Section (Optional)</InputLabel>
+                  <Select
+                    value={ticketForm.sectionId}
+                    label="Section (Optional)"
+                    onChange={(e) => setTicketForm({ ...ticketForm, sectionId: e.target.value })}
+                  >
+                    <MenuItem value="">
+                      <em>None — General admission (no specific section)</em>
+                    </MenuItem>
+                    {sections.map((sec) => (
+                      <MenuItem key={sec.id} value={sec.id}>
+                        {sec.name}
+                        {sec.hasNumberedSeats && ' (Numbered Seats)'}
+                        {sec.capacity ? ` — Capacity: ${sec.capacity}` : ''}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                {ticketForm.sectionId && sections.find(s => s.id === ticketForm.sectionId)?.hasNumberedSeats && (
+                  <Alert severity="info" sx={{ py: 0.5 }}>
+                    This section has numbered seats. Customers will need to select specific seats when booking.
+                  </Alert>
+                )}
+                {sections.length === 0 && (
+                  <Alert severity="warning" sx={{ py: 0.5 }}>
+                    No sections found for this venue. You can still create a general admission ticket type.
+                  </Alert>
+                )}
                 <TextField
                   label="Price (VND)"
                   type="number"

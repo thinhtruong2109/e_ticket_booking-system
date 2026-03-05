@@ -6,6 +6,7 @@ const seatApi = {
   createSeat: (data) => apiClient.post('/api/seats', data),
   getSeatsByVenue: (venueId) => apiClient.get(`/api/seats/venue/${venueId}`),
   getAvailableSeats: (scheduleId) => apiClient.get('/api/seats/available', { params: { scheduleId } }),
+  bulkCreate: (data) => apiClient.post('/api/seats/bulk', data),
 };
 
 export default seatApi;

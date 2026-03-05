@@ -342,6 +342,8 @@
 }
 ```
 
+> **Validation:** `totalTickets ≤ venue.totalCapacity` (nếu totalTickets được truyền)
+
 ---
 
 ### 3.4. Cập nhật sự kiện (Organizer/Admin)
@@ -624,6 +626,7 @@
 ```json
 {
   "eventId": 1,                        // ✅ Bắt buộc
+  "sectionId": 1,                      // ❌ Không bắt buộc (liên kết ticket type với section)
   "name": "VIP",                       // ✅ Bắt buộc
   "description": "Vé VIP hàng đầu",   // ❌ Không bắt buộc
   "price": 500000,                     // ✅ Bắt buộc, số dương
@@ -631,6 +634,11 @@
   "maxPerBooking": 5                   // ❌ Không bắt buộc (mặc định: 10)
 }
 ```
+
+> **Validation:**
+> - Σ totalQuantity các ticket types (cùng event) ≤ event.totalTickets
+> - Nếu có `sectionId`: totalQuantity ≤ section.capacity
+> - Nếu section.hasNumberedSeats = true: section phải có seats đã tạo, và totalQuantity ≤ số seat thực tế
 
 ---
 
@@ -660,12 +668,14 @@
       "quantity": 1
     }
   ],
-  "seatIds": [10, 11, 12],            // ❌ Không bắt buộc (dùng cho event có seat map)
+  "seatIds": [10, 11, 12],            // ⚠️ Bắt buộc nếu ticket type có section.hasNumberedSeats = true
   "promoCodeId": 1                     // ❌ Không bắt buộc (ID promo code, áp dụng khi tạo booking)
 }
 ```
 
-> **Lưu ý:** Nếu có `promoCodeId`, hệ thống sẽ validate promo code (status ACTIVE, thời hạn, usage limit, min order amount) **và kiểm tra applicationType** (GLOBAL → tất cả event; ORGANIZER_ALL → event phải do đúng organizer tổ chức; SPECIFIC_EVENTS → event phải nằm trong danh sách PromoCodeEventJoin). Tính discount và tạo `BookingPromoCode` record. `usedCount` của promo code chỉ được tăng khi thanh toán thành công (payment callback SUCCESS).
+> **Lưu ý về seatIds:** Nếu bất kỳ ticket type nào trong `items` thuộc section có `hasNumberedSeats = true`, thì `seatIds` **bắt buộc**. Số lượng seatIds phải bằng tổng quantity của các ticket types có numbered seats. Ghế phải available (chưa bị HOLDING/CONFIRMED) và thuộc đúng section. Cũng cần truyền `scheduleId` khi chọn ghế.
+
+> **Lưu ý về promoCodeId:** Nếu có `promoCodeId`, hệ thống sẽ validate promo code (status ACTIVE, thời hạn, usage limit, min order amount) **và kiểm tra applicationType** (GLOBAL → tất cả event; ORGANIZER_ALL → event phải do đúng organizer tổ chức; SPECIFIC_EVENTS → event phải nằm trong danh sách PromoCodeEventJoin). Tính discount và tạo `BookingPromoCode` record. `usedCount` của promo code chỉ được tăng khi thanh toán thành công (payment callback SUCCESS).
 
 ---
 
@@ -989,12 +999,16 @@
 ```json
 {
   "venueId": 1,                        // ✅ Bắt buộc
-  "name": "Khu VIP",                   // ✅ Bắt buộc
+  "name": "Khu VIP",                   // ✅ Bắt buộc (unique trong cùng venue)
   "description": "Khu vực hạng sang",  // ❌ Không bắt buộc
   "capacity": 100,                     // ❌ Không bắt buộc
   "hasNumberedSeats": true             // ❌ Không bắt buộc
 }
 ```
+
+> **Validation:**
+> - Tên section phải unique trong cùng venue
+> - Σ capacity các sections ≤ venue.totalCapacity
 
 ---
 
@@ -1030,6 +1044,8 @@
   "seatType": "VIP"                    // ❌ Không bắt buộc (VIP, REGULAR, WHEELCHAIR; mặc định: REGULAR)
 }
 ```
+
+> **Validation:** Số seat trong section ≤ section.capacity (áp dụng cho cả single và bulk create)
 
 ---
 

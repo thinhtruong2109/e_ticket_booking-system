@@ -7,17 +7,14 @@ import {
   Box,
   Button,
   Divider,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
   Alert,
   LinearProgress,
+  Chip,
 } from '@mui/material';
-import { Payment, Timer } from '@mui/icons-material';
+import { Payment, Timer, AccountBalanceWallet } from '@mui/icons-material';
 import { bookingApi, paymentApi } from '../../api';
 import { LoadingScreen, ErrorAlert, PageHeader } from '../../components/common';
 import { formatCurrency, formatDateTime, getErrorMessage } from '../../utils/helpers';
-import { PAYMENT_METHODS } from '../../utils/constants';
 
 const PaymentPage = () => {
   const { bookingId } = useParams();
@@ -26,7 +23,6 @@ const PaymentPage = () => {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('VNPAY');
   const [submitting, setSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(null);
 
@@ -70,7 +66,7 @@ const PaymentPage = () => {
     try {
       const res = await paymentApi.create({
         bookingId: parseInt(bookingId),
-        paymentMethod,
+        paymentMethod: 'PAYOS',
       });
 
       // If PayOS checkout URL returned, redirect to PayOS
@@ -80,7 +76,7 @@ const PaymentPage = () => {
         window.location.href = res.data.paymentUrl;
       } else {
         // Fallback: navigate to booking detail
-        navigate(`/bookings/${bookingId}`, { state: { paymentSuccess: true } });
+        navigate(`/my-bookings/${bookingId}`, { state: { paymentSuccess: true } });
       }
     } catch (err) {
       setError(getErrorMessage(err));
@@ -162,29 +158,27 @@ const PaymentPage = () => {
           </Typography>
           <Divider sx={{ mb: 2 }} />
 
-          <RadioGroup value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-            {PAYMENT_METHODS.map((method) => (
-              <FormControlLabel
-                key={method}
-                value={method}
-                control={<Radio sx={{ color: 'grey.400', '&.Mui-checked': { color: 'grey.900' } }} />}
-                label={
-                  <Box>
-                    <Typography variant="body2" fontWeight={600}>{method}</Typography>
-                  </Box>
-                }
-                sx={{
-                  mb: 1,
-                  p: 1.5,
-                  border: '1px solid',
-                  borderColor: paymentMethod === method ? 'grey.900' : 'divider',
-                  borderRadius: 1,
-                  mx: 0,
-                  bgcolor: paymentMethod === method ? 'grey.50' : 'white',
-                }}
-              />
-            ))}
-          </RadioGroup>
+          <Box
+            sx={{
+              p: 2,
+              border: '2px solid',
+              borderColor: 'primary.main',
+              borderRadius: 1,
+              bgcolor: 'primary.50',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+            }}
+          >
+            <AccountBalanceWallet color="primary" />
+            <Box>
+              <Typography variant="body1" fontWeight={600}>PayOS</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Secure online payment via PayOS gateway
+              </Typography>
+            </Box>
+            <Chip label="Selected" color="primary" size="small" sx={{ ml: 'auto' }} />
+          </Box>
         </Paper>
 
         <Button

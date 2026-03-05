@@ -113,7 +113,7 @@ const PaymentSuccessPage = () => {
             <Button
               variant="contained"
               startIcon={<ConfirmationNumber />}
-              onClick={() => navigate(`/bookings/${paymentInfo.bookingId}`)}
+              onClick={() => navigate(`/my-bookings/${paymentInfo.bookingId}`)}
             >
               Xem chi tiết đơn
             </Button>
@@ -121,7 +121,7 @@ const PaymentSuccessPage = () => {
           <Button
             variant="outlined"
             startIcon={<ArrowBack />}
-            onClick={() => navigate('/bookings')}
+            onClick={() => navigate('/my-bookings')}
           >
             Đơn đặt vé của tôi
           </Button>

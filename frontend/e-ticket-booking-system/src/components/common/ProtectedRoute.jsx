@@ -15,7 +15,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   }
 
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/403" replace />;
   }
 
   // Nếu có children (wrapper pattern) thì render children

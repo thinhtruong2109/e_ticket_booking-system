@@ -61,11 +61,12 @@ Phân khu vực trong venue (VIP Zone, Section A/B/C)
 
 ### Logic nghiệp vụ
 - **venue_id** *(FK → venues.id, NOT NULL)*: Section phải thuộc về một Venue cụ thể
-- **name**: Tên khu vực (VIP Zone, Section A, B, C...)
+- **name**: Tên khu vực (VIP Zone, Section A, B, C...). **Unique trong cùng venue**
 - **capacity**: Sức chứa của từng section
+  - **Constraint: Σ capacity các sections ≤ venue.totalCapacity**
 - **hasNumberedSeats**:
-  - `true`: Có ghế đánh số (Section A, B, C)
-  - `false`: Standing area (khu đứng)
+  - `true`: Có ghế đánh số → khi booking phải chọn ghế cụ thể, totalQuantity của TicketType ≤ số seat thực
+  - `false`: Standing area (khu đứng) → chỉ cần chọn số lượng
 - Giúp quản lý và pricing theo từng khu vực
 
 ---
@@ -80,6 +81,7 @@ Quản lý từng ghế ngồi cụ thể trong venue
 - **rowNumber + seatNumber**: Định danh ghế (VD: A-15 = Hàng A, Ghế 15)
 - **seatType**: Phân loại ghế (VIP, REGULAR, WHEELCHAIR)
 - Chỉ tồn tại khi venue có seat map (venue.hasSeatMap = true)
+- **Constraint: Số seat trong section ≤ section.capacity** (validate khi tạo single/bulk)
 - Dùng để hiển thị sơ đồ chỗ ngồi cho user chọn
 
 ---
@@ -94,6 +96,8 @@ Entity trung tâm - Quản lý sự kiện
 - **venue_id** *(FK → venues.id, NOT NULL)*: Event phải diễn ra tại một địa điểm cụ thể. Dùng để load seat map nếu venue.hasSeatMap = true
 - **Status workflow:** DRAFT → PUBLISHED → ONGOING → COMPLETED (hoặc CANCELLED)
 - **totalTickets & availableTickets**: Real-time inventory tracking
+  - **Constraint: totalTickets ≤ venue.totalCapacity** (validate khi tạo event)
+  - **Constraint: Σ totalQuantity các TicketType ≤ event.totalTickets** (validate khi tạo ticket type)
 - **allowTicketExchange**: Flag kiểm soát secondary market
   - `true`: Cho phép user bán/trao đổi vé trên platform
   - `false`: Vé không thể chuyển nhượng (event VIP/restricted)
@@ -121,9 +125,13 @@ Quản lý lịch chiếu/suất diễn của event
 
 ### Logic nghiệp vụ
 - **event_id** *(FK → events.id, NOT NULL)*: TicketType phải gắn với một Event cụ thể. Hệ thống validate ticket_type phải thuộc đúng event khi tạo booking, tránh mua nhầm loại vé của event khác
+- **section_id** *(FK → sections.id, NULLABLE)*: Liên kết ticket type với section cụ thể
+  - Nếu section.hasNumberedSeats = true: **totalQuantity ≤ số seat thực trong section**, và khi booking phải chọn ghế cụ thể
+  - Nếu có section: **totalQuantity ≤ section.capacity**
 - **name**: Tên loại vé (VIP, Regular, Early Bird...)
 - **price**: Giá cho từng loại vé
 - **totalQuantity & availableQuantity**: Quản lý inventory theo loại vé
+  - **Constraint: Σ totalQuantity (cùng event) ≤ event.totalTickets**
 - **maxPerBooking**: Giới hạn số vé/giao dịch (chống mua gom, bot)
 - Real-time update availableQuantity khi booking/cancel
 - Cho phép phân tầng giá linh hoạt

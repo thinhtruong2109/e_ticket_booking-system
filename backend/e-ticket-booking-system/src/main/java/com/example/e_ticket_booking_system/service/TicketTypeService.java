@@ -17,6 +17,7 @@ import com.example.e_ticket_booking_system.exception.BadRequestException;
 import com.example.e_ticket_booking_system.exception.ForbiddenException;
 import com.example.e_ticket_booking_system.exception.ResourceNotFoundException;
 import com.example.e_ticket_booking_system.repository.EventRepository;
+import com.example.e_ticket_booking_system.repository.SeatRepository;
 import com.example.e_ticket_booking_system.repository.SectionRepository;
 import com.example.e_ticket_booking_system.repository.TicketTypeRepository;
 
@@ -31,6 +32,7 @@ public class TicketTypeService {
     private final TicketTypeRepository ticketTypeRepository;
     private final EventRepository eventRepository;
     private final SectionRepository sectionRepository;
+    private final SeatRepository seatRepository;
 
     public TicketTypeResponse createTicketType(Long organizerId, CreateTicketTypeRequest request) {
         // Tìm event theo ID
@@ -48,6 +50,15 @@ public class TicketTypeService {
             throw new BadRequestException("Ticket type with name '" + request.getName() + "' already exists for this event");
         }
 
+        // Validate: sum of all ticket types' totalQuantity must not exceed event.totalTickets
+        int currentTotalQuantity = ticketTypeRepository.sumTotalQuantityByEventId(request.getEventId());
+        if (event.getTotalTickets() > 0 && currentTotalQuantity + request.getTotalQuantity() > event.getTotalTickets()) {
+            throw new BadRequestException(
+                    "Total ticket type quantity (" + (currentTotalQuantity + request.getTotalQuantity())
+                            + ") would exceed event total tickets (" + event.getTotalTickets()
+                            + "). Current ticket types use " + currentTotalQuantity + " tickets");
+        }
+
         TicketType ticketType = new TicketType();
         ticketType.setEvent(event);
 
@@ -57,7 +68,35 @@ public class TicketTypeService {
             if (!optionalSection.isPresent()) {
                 throw new ResourceNotFoundException("Section not found with id: " + request.getSectionId());
             }
-            ticketType.setSection(optionalSection.get());
+            Section section = optionalSection.get();
+
+            // Validate: totalQuantity must not exceed section capacity
+            if (section.getCapacity() != null && request.getTotalQuantity() > section.getCapacity()) {
+                throw new BadRequestException(
+                        "Total quantity (" + request.getTotalQuantity()
+                                + ") exceeds section '" + section.getName()
+                                + "' capacity (" + section.getCapacity() + ")");
+            }
+
+            // Validate: if section has numbered seats, totalQuantity must not exceed actual seat count
+            if (Boolean.TRUE.equals(section.getHasNumberedSeats())) {
+                long seatCount = seatRepository.countBySectionId(section.getId());
+                if (seatCount == 0) {
+                    throw new BadRequestException(
+                            "Section '" + section.getName()
+                                    + "' has numbered seats enabled but no seats have been created yet. "
+                                    + "Please create seats first before adding ticket types");
+                }
+                if (request.getTotalQuantity() > seatCount) {
+                    throw new BadRequestException(
+                            "Total quantity (" + request.getTotalQuantity()
+                                    + ") exceeds the number of actual seats (" + seatCount
+                                    + ") in section '" + section.getName()
+                                    + "'. For numbered seat sections, ticket quantity cannot exceed seat count");
+                }
+            }
+
+            ticketType.setSection(section);
         }
 
         ticketType.setName(request.getName());
@@ -113,12 +152,14 @@ public class TicketTypeService {
     private TicketTypeResponse toResponse(TicketType tt) {
         Long sectionId = null;
         String sectionName = null;
+        Boolean hasNumberedSeats = null;
         if (tt.getSection() != null) {
             sectionId = tt.getSection().getId();
             sectionName = tt.getSection().getName();
+            hasNumberedSeats = tt.getSection().getHasNumberedSeats();
         }
         return new TicketTypeResponse(
-                tt.getId(), tt.getEvent().getId(), sectionId, sectionName,
+                tt.getId(), tt.getEvent().getId(), sectionId, sectionName, hasNumberedSeats,
                 tt.getName(), tt.getDescription(), tt.getPrice(),
                 tt.getTotalQuantity(), tt.getAvailableQuantity(), tt.getMaxPerBooking());
     }

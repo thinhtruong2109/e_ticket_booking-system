@@ -207,7 +207,7 @@ const BookingDetailPage = () => {
                     variant="contained"
                     fullWidth
                     startIcon={<Payment />}
-                    onClick={() => navigate(`/bookings/${id}/payment`)}
+                    onClick={() => navigate(`/payment/${id}`)}
                   >
                     Pay Now
                   </Button>

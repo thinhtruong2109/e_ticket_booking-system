@@ -68,16 +68,17 @@ const Header = () => {
     { label: 'Profile', path: '/profile', icon: <Person /> },
     { label: 'My Tickets', path: '/my-tickets', icon: <ConfirmationNumber /> },
     { label: 'My Bookings', path: '/my-bookings', icon: <BookOnline /> },
+    { label: 'My Listings', path: '/my-listings', icon: <Store /> },
   ];
 
   if (isAdmin) {
-    userMenuItems.unshift({ label: 'Admin Dashboard', path: '/admin', icon: <Dashboard /> });
+    userMenuItems.unshift({ label: 'Admin Portal', path: '/admin/dashboard', icon: <Dashboard /> });
   }
   if (isOrganizer) {
-    userMenuItems.unshift({ label: 'Organizer Dashboard', path: '/organizer', icon: <Dashboard /> });
+    userMenuItems.unshift({ label: 'Organizer Portal', path: '/organizer/dashboard', icon: <Dashboard /> });
   }
   if (isStaff) {
-    userMenuItems.unshift({ label: 'Check-in Scanner', path: '/staff/check-in', icon: <ConfirmationNumber /> });
+    userMenuItems.unshift({ label: 'Staff Portal', path: '/staff/checkin', icon: <ConfirmationNumber /> });
   }
 
   const mobileDrawer = (

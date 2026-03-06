@@ -4,9 +4,11 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,6 +43,20 @@ public class SeatController {
     @GetMapping("/sections/venue/{venueId}")
     public ResponseEntity<ApiResponse<List<SectionResponse>>> getSectionsByVenue(@PathVariable Long venueId) {
         return ResponseEntity.ok(ApiResponse.success(seatService.getSectionsByVenue(venueId)));
+    }
+
+    @PutMapping("/sections/{id}")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<SectionResponse>> updateSection(
+            @PathVariable Long id, @Valid @RequestBody CreateSectionRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Section updated", seatService.updateSection(id, request)));
+    }
+
+    @DeleteMapping("/sections/{id}")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteSection(@PathVariable Long id) {
+        seatService.deleteSection(id);
+        return ResponseEntity.ok(ApiResponse.success("Section deleted", null));
     }
 
     // Seat endpoints

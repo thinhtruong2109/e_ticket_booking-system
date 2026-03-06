@@ -14,6 +14,7 @@ public class TicketTypeResponse {
     private Long eventId;
     private Long sectionId;
     private String sectionName;
+    private Boolean hasNumberedSeats;
     private String name;
     private String description;
     private BigDecimal price;

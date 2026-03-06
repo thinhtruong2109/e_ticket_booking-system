@@ -1,12 +1,16 @@
+
+
 package com.example.e_ticket_booking_system.controller;
 
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.e_ticket_booking_system.config.SecurityUtils;
 import com.example.e_ticket_booking_system.dto.request.CreateTicketTypeRequest;
+import com.example.e_ticket_booking_system.dto.request.UpdateTicketTypeRequest;
 import com.example.e_ticket_booking_system.dto.response.ApiResponse;
 import com.example.e_ticket_booking_system.dto.response.TicketTypeResponse;
 import com.example.e_ticket_booking_system.service.TicketTypeService;
@@ -51,5 +56,25 @@ public class TicketTypeController {
         Long organizerId = securityUtils.getCurrentUserId();
         return ResponseEntity.ok(ApiResponse.success("Ticket type created",
                 ticketTypeService.createTicketType(organizerId, request)));
+    }
+
+    
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<TicketTypeResponse>> updateTicketType(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTicketTypeRequest request) {
+        Long organizerId = securityUtils.getCurrentUserId();
+        request.setId(id);
+        return ResponseEntity.ok(ApiResponse.success("Ticket type updated",
+                ticketTypeService.updateTicketType(organizerId, request)));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteTicketType(@PathVariable Long id) {
+        Long organizerId = securityUtils.getCurrentUserId();
+        ticketTypeService.deleteTicketType(organizerId, id);
+        return ResponseEntity.ok(ApiResponse.success("Ticket type deleted", null));
     }
 }

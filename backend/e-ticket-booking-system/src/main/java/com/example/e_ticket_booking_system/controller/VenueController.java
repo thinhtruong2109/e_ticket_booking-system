@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -55,5 +56,12 @@ public class VenueController {
     public ResponseEntity<ApiResponse<VenueResponse>> updateVenue(
             @PathVariable Long id, @Valid @RequestBody CreateVenueRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Venue updated", venueService.updateVenue(id, request)));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteVenue(@PathVariable Long id) {
+        venueService.deleteVenue(id);
+        return ResponseEntity.ok(ApiResponse.success("Venue deleted", null));
     }
 }

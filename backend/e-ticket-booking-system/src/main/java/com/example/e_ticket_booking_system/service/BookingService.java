@@ -141,6 +141,35 @@ public class BookingService {
             details.add(detail);
         }
 
+        // Check if any ticket type requires numbered seats (hasNumberedSeats = true)
+        boolean requiresSeats = false;
+        int numberedSeatQuantity = 0;
+        for (BookingDetail detail : details) {
+            TicketType tt = detail.getTicketType();
+            if (tt.getSection() != null && Boolean.TRUE.equals(tt.getSection().getHasNumberedSeats())) {
+                requiresSeats = true;
+                numberedSeatQuantity += detail.getQuantity();
+            }
+        }
+
+        // Validate: if any ticket type requires numbered seats, seatIds must be provided
+        if (requiresSeats) {
+            if (request.getSeatIds() == null || request.getSeatIds().isEmpty()) {
+                throw new BadRequestException(
+                        "Seat selection is required for ticket types with numbered seats. "
+                        + "Please select " + numberedSeatQuantity + " seat(s)");
+            }
+            if (request.getSeatIds().size() != numberedSeatQuantity) {
+                throw new BadRequestException(
+                        "Number of selected seats (" + request.getSeatIds().size()
+                        + ") must match numbered seat ticket quantity (" + numberedSeatQuantity + ")");
+            }
+            if (schedule == null) {
+                throw new BadRequestException(
+                        "Schedule is required when booking tickets with numbered seats");
+            }
+        }
+
         // Validate: tổng quantity phải bằng số seatIds (nếu có chọn ghế)
         if (request.getSeatIds() != null && !request.getSeatIds().isEmpty()) {
             int totalQuantity = 0;

@@ -10,8 +10,12 @@ import org.springframework.stereotype.Service;
 
 import com.example.e_ticket_booking_system.dto.request.CreateVenueRequest;
 import com.example.e_ticket_booking_system.dto.response.VenueResponse;
+import com.example.e_ticket_booking_system.entity.Seat;
+import com.example.e_ticket_booking_system.entity.Section;
 import com.example.e_ticket_booking_system.entity.Venue;
 import com.example.e_ticket_booking_system.exception.ResourceNotFoundException;
+import com.example.e_ticket_booking_system.repository.SeatRepository;
+import com.example.e_ticket_booking_system.repository.SectionRepository;
 import com.example.e_ticket_booking_system.repository.VenueRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -23,6 +27,8 @@ public class VenueService {
     private static final Logger log = LoggerFactory.getLogger(VenueService.class);
 
     private final VenueRepository venueRepository;
+    private final SectionRepository sectionRepository;
+    private final SeatRepository seatRepository;
 
     public List<VenueResponse> getAllVenues() {
         List<Venue> venues = venueRepository.findAll();
@@ -90,6 +96,26 @@ public class VenueService {
         venue = venueRepository.save(venue);
         log.info("Venue updated: {}", venue.getName());
         return toResponse(venue);
+    }
+
+    public void deleteVenue(Long id) {
+        Venue venue = venueRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Venue not found with id: " + id));
+
+        // Delete all seats in this venue
+        List<Seat> seats = seatRepository.findByVenueId(id);
+        if (!seats.isEmpty()) {
+            seatRepository.deleteAll(seats);
+        }
+
+        // Delete all sections in this venue
+        List<Section> sections = sectionRepository.findByVenueId(id);
+        if (!sections.isEmpty()) {
+            sectionRepository.deleteAll(sections);
+        }
+
+        venueRepository.delete(venue);
+        log.info("Venue deleted: {}", venue.getName());
     }
 
     private VenueResponse toResponse(Venue venue) {

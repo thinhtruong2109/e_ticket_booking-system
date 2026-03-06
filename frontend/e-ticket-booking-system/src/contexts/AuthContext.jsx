@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async (email, password) => {
     const response = await authApi.login({ email, password });
-    const { accessToken, refreshToken, ...userData } = response.data;
+    const { accessToken, refreshToken, user: userData } = response.data;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = useCallback(async (data) => {
     const response = await authApi.register(data);
-    const { accessToken, refreshToken, ...userData } = response.data;
+    const { accessToken, refreshToken, user: userData } = response.data;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));

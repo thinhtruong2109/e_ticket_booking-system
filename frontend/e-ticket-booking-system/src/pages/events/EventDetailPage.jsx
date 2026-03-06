@@ -68,7 +68,7 @@ const EventDetailPage = () => {
       navigate('/login', { state: { from: { pathname: `/events/${id}` } } });
       return;
     }
-    navigate(`/bookings/create/${id}`);
+    navigate(`/events/${id}/booking`);
   };
 
   if (loading) return <LoadingScreen />;

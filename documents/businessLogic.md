@@ -135,17 +135,24 @@
 ### **5.1. Create Sections**
 - Validate section name unique trong venue
 - Create section với capacity, has_numbered_seats
+- **Validate: Σ capacity các section ≤ venue.totalCapacity** (nếu venue có totalCapacity)
+  - Query `SUM(capacity) FROM sections WHERE venue_id = ?`
+  - Nếu sum + new capacity > venue.totalCapacity → reject
 
 ### **5.2. Create Seats**
 - Generate seats cho section
 - Auto-generate seat_number (A1, A2, ..., B1, B2...)
 - Assign seat_type (VIP, REGULAR, WHEELCHAIR)
+- **Validate: Số seat trong section ≤ section.capacity** (single & bulk create)
+  - Query `COUNT(*) FROM seats WHERE section_id = ?`
+  - Nếu count + newSeats > section.capacity → reject
 
 ### **5.3. Get Available Seats**
 - Input: event_schedule_id
+- Tìm venue thông qua schedule → event → venue (không phụ thuộc vào reservation có sẵn)
 - Lấy tất cả seats của venue
-- Check SeatReservation để loại ghế đã book
-- Return available seats grouped by section
+- Check SeatReservation (HOLDING + CONFIRMED) để đánh dấu ghế đã book
+- Return tất cả seats với trạng thái available/taken
 
 ---
 
@@ -157,6 +164,7 @@
 - Upload banner & thumbnail images
 - Create event với status = DRAFT
 - Calculate total_tickets từ venue capacity (hoặc set manual)
+- **Validate: totalTickets ≤ venue.totalCapacity** (nếu venue có totalCapacity)
 - Set available_tickets = total_tickets
 - Set allow_ticket_exchange = true (default)
 
@@ -202,6 +210,14 @@
 - VIP, Regular, Early Bird, etc.
 - Set price, total_quantity, max_per_booking
 - Set available_quantity = total_quantity
+- **Validate: Σ totalQuantity các ticket types ≤ event.totalTickets**
+  - Query `SUM(totalQuantity) FROM ticket_types WHERE event_id = ?`
+  - Nếu sum + new totalQuantity > event.totalTickets → reject
+- **Validate: Nếu có section → totalQuantity ≤ section.capacity**
+- **Validate: Nếu section.hasNumberedSeats = true:**
+  - Phải có seats đã tạo trong section (count > 0)
+  - totalQuantity ≤ số seat thực tế trong section
+  - Đây là constraint quan trọng: không thể bán nhiều vé hơn số ghế thực
 
 ### **7.2. Update Ticket Type**
 - Nếu đã có booking → không được giảm total_quantity xuống dưới sold
@@ -246,11 +262,15 @@
 - Foreach ticket_type:
   - Check available_quantity >= requested quantity
   - Check quantity <= max_per_booking
-- Nếu event có seat map:
-  - Check seats available
-  - User phải chọn specific seats
+- **Check hasNumberedSeats trên section của ticket type:**
+  - Nếu section.hasNumberedSeats = true → **bắt buộc** gửi seatIds
+  - Số seatIds phải bằng tổng quantity của các ticket types có numbered seats
+  - Phải có scheduleId khi chọn ghế
+- Nếu seatIds được gửi:
+  - Check seats available (không bị HOLDING/CONFIRMED)
+  - Seats phải thuộc đúng section của ticket type
 
-#### **Step 3: Reserve Seats (nếu có seat map)**
+#### **Step 3: Reserve Seats (nếu có seatIds)**
 - Foreach selected seat:
   - Create SeatReservation với status = HOLDING
   - Set hold_expires_at = now + 15 phút

@@ -97,6 +97,14 @@ public class EventService {
         } else if (venue.getTotalCapacity() != null) {
             totalTickets = venue.getTotalCapacity();
         }
+
+        // Validate: totalTickets must not exceed venue totalCapacity
+        if (venue.getTotalCapacity() != null && totalTickets > venue.getTotalCapacity()) {
+            throw new BadRequestException(
+                    "Total tickets (" + totalTickets + ") cannot exceed venue total capacity ("
+                            + venue.getTotalCapacity() + ")");
+        }
+
         event.setTotalTickets(totalTickets);
         event.setAvailableTickets(totalTickets);
 
@@ -189,7 +197,7 @@ public class EventService {
         // 1. Thu thập các thay đổi để track & thông báo cho customers
         // ============================================================
         List<String> changes = new ArrayList<>();
-        boolean hasActiveBookings = false;
+        boolean hasActiveBookings;
 
         // Lấy danh sách bookings active (PENDING hoặc CONFIRMED) của event
         List<Booking> allBookings = bookingRepository.findByEventId(eventId);

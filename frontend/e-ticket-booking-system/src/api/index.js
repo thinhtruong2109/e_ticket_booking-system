@@ -12,3 +12,5 @@ export { default as venueApi } from './venueApi';
 export { default as seatApi } from './seatApi';
 export { default as promoCodeApi } from './promoCodeApi';
 export { default as ticketListingApi } from './ticketListingApi';
+export { default as walletApi } from './walletApi';
+export { default as transactionHistoryApi } from './transactionHistoryApi';

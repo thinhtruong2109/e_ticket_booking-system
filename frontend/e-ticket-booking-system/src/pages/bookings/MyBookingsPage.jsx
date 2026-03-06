@@ -108,7 +108,7 @@ const MyBookingsPage = () => {
                         <Button
                           size="small"
                           startIcon={<Visibility />}
-                          onClick={() => navigate(`/bookings/${booking.id}`)}
+                          onClick={() => navigate(`/my-bookings/${booking.id}`)}
                         >
                           View
                         </Button>

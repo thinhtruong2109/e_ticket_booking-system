@@ -1,40 +1,50 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: postgres
+    image: postgres:15
     environment:
-      POSTGRES_DB: e-ticket-booking
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Password@123
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
+      - pgdata:/var/lib/postgresql/data
+    restart: always
 
   backend:
-    build:
-      context: ./backend/e-ticket-booking-system
-      dockerfile: Dockerfile
-    container_name: backend
+    build: ./backend/e-ticket-booking-system
     ports:
       - "8080:8080"
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
+      BOOKING_HOLD_DURATION: ${BOOKING_HOLD_DURATION}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID}
+      PAYOS_API_KEY: ${PAYOS_API_KEY}
+      PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY}
+      PAYOS_RETURN_URL: ${PAYOS_RETURN_URL}
+      PAYOS_CANCEL_URL: ${PAYOS_CANCEL_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
     depends_on:
       - postgres
-    restart: unless-stopped
+    restart: always
 
   frontend:
-    build:
-      context: ./frontend/e-ticket-booking-system
-      dockerfile: Dockerfile
-    container_name: frontend
+    build: ./frontend/e-ticket-booking-system
     ports:
       - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+      ALLOWED_HOST: ${ALLOWED_HOST} 
     depends_on:
       - backend
-    restart: unless-stopped
+    restart: always
 
 volumes:
-  postgres_data:
+  pgdata:

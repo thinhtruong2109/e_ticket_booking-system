@@ -33,12 +33,12 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh '''echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'''
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
                     sh """
-                        docker buildx build \\
-                          --platform linux/amd64 \\
-                          -t ${BACKEND_IMAGE} \\
-                          --push \\
+                        docker buildx build \
+                          --platform linux/amd64 \
+                          -t ${BACKEND_IMAGE} \
+                          --push \
                           ./backend/e-ticket-booking-system
                     """
                 }
@@ -53,12 +53,12 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh '''echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'''
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
                     sh """
-                        docker buildx build \\
-                          --platform linux/amd64 \\
-                          -t ${FRONTEND_IMAGE} \\
-                          --push \\
+                        docker buildx build \
+                          --platform linux/amd64 \
+                          -t ${FRONTEND_IMAGE} \
+                          --push \
                           ./frontend/e-ticket-booking-system
                     """
                 }
@@ -71,9 +71,9 @@ pipeline {
                 dir('/home/ubuntu/eticket') {
                     sh """
                         docker pull ${BACKEND_IMAGE}
-                        docker-compose stop backend
-                        docker-compose rm -f backend
-                        docker-compose up -d backend
+                        docker compose stop backend
+                        docker compose rm -f backend
+                        docker compose up -d backend
                     """
                 }
             }
@@ -85,9 +85,9 @@ pipeline {
                 dir('/home/ubuntu/eticket') {
                     sh """
                         docker pull ${FRONTEND_IMAGE}
-                        docker-compose stop frontend
-                        docker-compose rm -f frontend
-                        docker-compose up -d frontend
+                        docker compose stop frontend
+                        docker compose rm -f frontend
+                        docker compose up -d frontend
                     """
                 }
             }

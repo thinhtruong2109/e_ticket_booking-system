@@ -7,7 +7,7 @@ const LoadingScreen = ({ message = 'Loading...' }) => (
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: '61vh',
+      minHeight: '60vh',
       gap: 2,
     }}
   >

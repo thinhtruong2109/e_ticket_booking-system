@@ -36,7 +36,7 @@ pipeline {
                     sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
                     sh """
                         docker buildx build \
-                          --platform linux/amd64,linux/arm64 \
+                          --platform linux/amd64 \
                           -t ${BACKEND_IMAGE} \
                           --push \
                           ./backend/e-ticket-booking-system
@@ -56,7 +56,7 @@ pipeline {
                     sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
                     sh """
                         docker buildx build \
-                          --platform linux/amd64,linux/arm64 \
+                          --platform linux/amd64 \
                           -t ${FRONTEND_IMAGE} \
                           --push \
                           ./frontend

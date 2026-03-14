@@ -46,6 +46,11 @@ const LoginPage = () => {
     }
   };
 
+  // Google login handler
+  const handleGoogleLogin = () => {
+    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/oauth2/authorization/google`;
+  };
+
   return (
     <Box
       sx={{
@@ -121,6 +126,16 @@ const LoginPage = () => {
             {loading ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
+
+        <Button
+          onClick={handleGoogleLogin}
+          variant="outlined"
+          fullWidth
+          size="large"
+          sx={{ py: 1.5, mb: 2, mt: 1 }}
+        >
+          Đăng nhập với Google
+        </Button>
 
         <Typography variant="body2" color="text.secondary" textAlign="center">
           Don&apos;t have an account?{' '}

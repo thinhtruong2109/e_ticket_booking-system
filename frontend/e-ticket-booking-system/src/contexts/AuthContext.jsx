@@ -19,8 +19,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (token && !user) {
+    // Luôn fetch profile nếu chưa có user (cookie sẽ tự gửi)
+    if (!user) {
       userApi
         .getProfile()
         .then((res) => {
@@ -29,8 +29,6 @@ export const AuthProvider = ({ children }) => {
           localStorage.setItem('user', JSON.stringify(userData));
         })
         .catch(() => {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
           setUser(null);
         })
@@ -41,10 +39,9 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = useCallback(async (email, password) => {
+    // Server tự set cookie, response chỉ trả user info
     const response = await authApi.login({ email, password });
-    const { accessToken, refreshToken, user: userData } = response.data;
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    const userData = response.data;
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     return userData;
@@ -52,9 +49,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = useCallback(async (data) => {
     const response = await authApi.register(data);
-    const { accessToken, refreshToken, user: userData } = response.data;
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    const userData = response.data;
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
     return userData;
@@ -62,8 +57,6 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(() => {
     authApi.logout().catch(() => {});
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setUser(null);
   }, []);

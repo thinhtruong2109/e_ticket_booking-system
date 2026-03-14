@@ -28,8 +28,15 @@ public class User {
     @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
     
-    @Column(name = "password", nullable = false, length = 255)
+
+    @Column(name = "password", nullable = true, length = 255)
     private String password;
+
+    @Column(name = "provider", length = 20)
+    private String provider; // "LOCAL" hoặc "GOOGLE"
+
+    @Column(name = "provider_id", length = 100)
+    private String providerId; // Google sub ID
     
     @Column(name = "full_name", nullable = false, length = 200)
     private String fullName;

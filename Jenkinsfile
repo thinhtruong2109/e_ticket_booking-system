@@ -59,7 +59,7 @@ pipeline {
                           --platform linux/amd64 \
                           -t ${FRONTEND_IMAGE} \
                           --push \
-                          ./frontend
+                          ./frontend/e-ticket-booking-system
                     """
                 }
             }

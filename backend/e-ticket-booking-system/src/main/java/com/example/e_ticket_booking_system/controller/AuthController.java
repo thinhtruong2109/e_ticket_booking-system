@@ -4,6 +4,7 @@ package com.example.e_ticket_booking_system.controller;
 import java.time.Duration;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthController {
 
+    @Value("${app.cookie-secure:false}")
+        private boolean cookieSecure;
+
     private final AuthService authService;
 
     @PostMapping("/register")
@@ -38,23 +42,22 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Registration successful", response));
     }
 
-
     // Helper: set token cookies
     private void setTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
-        boolean isSecure = false; // Set true nếu production
+        boolean isSecure = cookieSecure; // Set true nếu production (configurable)
         ResponseCookie accessCookie = ResponseCookie.from("accessToken", accessToken)
             .httpOnly(true)
             .secure(isSecure)
             .path("/")
             .maxAge(Duration.ofHours(1))
-            .sameSite("Lax")
+            .sameSite(cookieSecure ? "None" : "Lax")
             .build();
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
             .httpOnly(true)
             .secure(isSecure)
-            .path("/") // Đổi path thành '/' để cookie luôn xuất hiện
+            .path("/")
             .maxAge(Duration.ofDays(7))
-            .sameSite("Lax")
+            .sameSite(cookieSecure ? "None" : "Lax")
             .build();
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
@@ -68,17 +71,33 @@ public class AuthController {
     }
 
     @PostMapping("/refresh-token")
-    public ResponseEntity<ApiResponse<?>> refreshToken(@Valid @RequestBody RefreshTokenRequest request, HttpServletResponse response) {
-        AuthResponse auth = authService.refreshToken(request);
+    public ResponseEntity<ApiResponse<?>> refreshToken(@RequestBody(required = false) RefreshTokenRequest request,
+                                                       jakarta.servlet.http.HttpServletRequest servletRequest,
+                                                       HttpServletResponse response) {
+        String refreshToken = null;
+        if (request != null && request.getRefreshToken() != null && !request.getRefreshToken().isBlank()) {
+            refreshToken = request.getRefreshToken();
+        } else if (servletRequest.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : servletRequest.getCookies()) {
+                if ("refreshToken".equals(cookie.getName())) {
+                    refreshToken = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        RefreshTokenRequest effectiveRequest = new RefreshTokenRequest();
+        effectiveRequest.setRefreshToken(refreshToken);
+
+        AuthResponse auth = authService.refreshToken(effectiveRequest);
         setTokenCookies(response, auth.getAccessToken(), auth.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.success("Token refreshed", auth.getUser()));
     }
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse response) {
-        boolean isSecure = false; // Set true nếu production
+        boolean isSecure = cookieSecure; // Set true nếu production (configurable)
         ResponseCookie clearAccess = ResponseCookie.from("accessToken", "")
-                .httpOnly(true).secure(isSecure).path("/").maxAge(0).build();
+            .httpOnly(true).secure(isSecure).path("/").maxAge(0).build();
         ResponseCookie clearRefresh = ResponseCookie.from("refreshToken", "")
             .httpOnly(true).secure(isSecure).path("/").maxAge(0).build();
         response.addHeader(HttpHeaders.SET_COOKIE, clearAccess.toString());

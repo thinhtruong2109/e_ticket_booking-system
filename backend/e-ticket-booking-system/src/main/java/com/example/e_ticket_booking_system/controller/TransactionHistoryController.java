@@ -65,7 +65,7 @@ public class TransactionHistoryController {
      * [ADMIN] Lấy tất cả lịch sử giao dịch
      */
     @GetMapping("/admin")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<TransactionHistoryResponse>>> getAllTransactions() {
         return ResponseEntity.ok(ApiResponse.success(
                 transactionHistoryService.getAllTransactions()));
@@ -75,7 +75,7 @@ public class TransactionHistoryController {
      * [ADMIN] Lấy lịch sử giao dịch của user bất kỳ
      */
     @GetMapping("/admin/user/{userId}")
-    @PreAuthorize("hasAuthority('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<TransactionHistoryResponse>>> getTransactionsByUser(
             @PathVariable Long userId) {
         return ResponseEntity.ok(ApiResponse.success(

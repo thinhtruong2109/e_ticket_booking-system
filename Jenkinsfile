@@ -95,6 +95,12 @@ pipeline {
     }
 
     post {
+        always {
+            sh '''
+                docker builder prune -f --filter "until=24h"
+                docker image prune -f
+            '''
+        }
         success { echo "Deploy thanh cong!" }
         failure { echo "Deploy that bai, kiem tra log!" }
     }

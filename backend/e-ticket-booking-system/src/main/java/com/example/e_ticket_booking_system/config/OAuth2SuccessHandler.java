@@ -27,10 +27,13 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private final UserRepository userRepository;
 
     @Value("${app.frontend-url}")
-    private String frontendUrl;
+        private String frontendUrl;
 
     @Value("${spring.profiles.active:dev}")
-    private String activeProfile;
+        private String activeProfile;
+    
+    @Value("${app.cookie-samesite:Lax}")
+        private String cookieSameSite;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -65,14 +68,14 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
                 .secure(isSecure)
                 .path("/")
                 .maxAge(Duration.ofHours(1))
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
         ResponseCookie refreshCookie = ResponseCookie.from("refreshToken", refreshToken)
                 .httpOnly(true)
                 .secure(isSecure)
                 .path("/api/auth/refresh-token")
                 .maxAge(Duration.ofDays(7))
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());

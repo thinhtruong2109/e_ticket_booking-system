@@ -48,8 +48,7 @@ const LoginPage = () => {
 
   // Google login handler
   const handleGoogleLogin = () => {
-    const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-    window.location.href = `${apiBaseUrl}/eticket/oauth2/authorization/google`;
+    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/api/oauth2/authorization/google`;
   };
 
   return (

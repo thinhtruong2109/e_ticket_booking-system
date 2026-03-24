@@ -66,7 +66,7 @@ const LoginPage = () => {
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Box
             component="img"
-            src="/APPICON.png"
+            src={`${import.meta.env.BASE_URL}APPICON.png`}
             alt="Alo Vé"
             sx={{ height: 45, width: 'auto', mb: 1.5 }}
           />

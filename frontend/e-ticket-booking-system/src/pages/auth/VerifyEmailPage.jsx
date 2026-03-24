@@ -101,7 +101,7 @@ const VerifyEmailPage = () => {
       <Paper sx={{ maxWidth: 440, width: '100%', p: { xs: 3, sm: 5 }, textAlign: 'center' }}>
         <Box
           component="img"
-          src="/APPICON.png"
+          src={`${import.meta.env.BASE_URL}APPICON.png`}
           alt="Alo Vé"
           sx={{ height: 45, width: 'auto', mb: 1.5 }}
         />

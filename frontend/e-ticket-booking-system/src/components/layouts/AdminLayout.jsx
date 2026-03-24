@@ -65,7 +65,7 @@ const AdminLayout = () => {
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Box
           component="img"
-          src="/APPICON.png"
+          src={`${import.meta.env.BASE_URL}APPICON.png`}
           alt="Alo Vé"
           sx={{ height: 36, cursor: 'pointer' }}
           onClick={() => navigate('/')}

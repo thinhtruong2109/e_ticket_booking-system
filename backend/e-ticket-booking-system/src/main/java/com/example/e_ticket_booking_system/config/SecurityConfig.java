@@ -83,6 +83,12 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth2 -> oauth2
+                .authorizationEndpoint(auth -> auth
+                    .baseUri("/eticket/oauth2/authorization")
+                )
+                .redirectionEndpoint(redir -> redir
+                    .baseUri("/eticket/login/oauth2/code/*")
+                )
                 .successHandler(oAuth2SuccessHandler)
                 .failureUrl(frontendUrl + "/login?error=oauth2_failed")
             )

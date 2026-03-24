@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { getApiBaseUrl, withAppBase } from '../utils/url';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = getApiBaseUrl();
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -33,7 +34,7 @@ apiClient.interceptors.response.use(
         await axios.post(`${API_BASE_URL}/api/auth/refresh-token`, {}, { withCredentials: true });
         return apiClient(originalRequest);
       } catch {
-        window.location.href = '/login';
+        window.location.href = withAppBase('login');
       }
     }
     return Promise.reject(error);

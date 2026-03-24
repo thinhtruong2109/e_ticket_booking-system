@@ -92,6 +92,12 @@ public class SecurityConfig {
                 .successHandler(oAuth2SuccessHandler)
                 .failureUrl(frontendUrl + "/login?error=oauth2_failed")
             )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setStatus(401);
+                    response.getWriter().write("Unauthorized");
+                })
+            )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

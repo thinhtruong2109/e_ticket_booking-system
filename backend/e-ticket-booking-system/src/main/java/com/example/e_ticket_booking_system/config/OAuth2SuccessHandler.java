@@ -81,6 +81,6 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie.toString());
 
         // Redirect về frontend
-        getRedirectStrategy().sendRedirect(request, response, frontendUrl + "/oauth2/callback");
+        getRedirectStrategy().sendRedirect(request, response, frontendUrl + "/eticket/oauth2/callback");
     }
 }

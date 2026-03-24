@@ -49,7 +49,7 @@ const LoginPage = () => {
 
   // Google login handler
   const handleGoogleLogin = () => {
-    window.location.href = `${getApiBaseUrl()}/api/oauth2/authorization/google`;
+    window.location.href = `${getApiBaseUrl()}/oauth2/authorization/google`;
     // http://15.135.138.144:8080/api/oauth2/authorization/google
   };
 

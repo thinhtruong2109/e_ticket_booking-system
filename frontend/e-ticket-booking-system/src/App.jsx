@@ -59,7 +59,7 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <SnackbarProvider maxSnack={3} anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
-        <BrowserRouter>
+        <BrowserRouter basename="/eticket">
           <AuthProvider>
             <Routes>
               {/* ─── Public + Customer routes (MainLayout) ─── */}

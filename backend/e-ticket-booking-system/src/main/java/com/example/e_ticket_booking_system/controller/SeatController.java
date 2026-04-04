@@ -31,7 +31,7 @@ import lombok.RequiredArgsConstructor;
 public class SeatController {
 
     private final SeatService seatService;
-
+    //rebuild backend due to error smtp password
     // Section endpoints
     @PostMapping("/sections")
     @PreAuthorize("hasAnyRole('ORGANIZER', 'ADMIN')")

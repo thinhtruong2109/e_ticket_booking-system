@@ -9,13 +9,14 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import jakarta.mail.MessagingException;
-import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class EmailService {
+
+    private static final String SENDER_NAME = "Alo Vé";
 
     private final JavaMailSender mailSender;
 
@@ -31,7 +32,7 @@ public class EmailService {
 
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-    helper.setFrom(new InternetAddress("truongquangthinh21092004@gmail.com", "Alo Vé"));
+            helper.setFrom(from, SENDER_NAME);
             helper.setTo(toEmail);
             helper.setSubject("Verify your email - E-Ticket OTP");
             helper.setText(html, true);
@@ -65,7 +66,7 @@ public class EmailService {
 
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-            helper.setFrom(from);
+            helper.setFrom(from, SENDER_NAME);
             helper.setTo(toEmail);
             helper.setSubject("Event Update: " + eventName + " - E-Ticket");
             helper.setText(html, true);

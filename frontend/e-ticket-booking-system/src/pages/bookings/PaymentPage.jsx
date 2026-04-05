@@ -37,18 +37,14 @@ const PaymentPage = () => {
 
     const expiresAtMs = toDateTimeMillis(booking.holdExpiresAt);
     if (!Number.isFinite(expiresAtMs)) {
-      setTimeLeft(0);
-      setError('Booking expiration time is invalid. Please refresh and try again.');
+      // Keep payment available; backend will validate real expiration.
+      setTimeLeft(null);
       return;
     }
 
     const updateCountdown = () => {
       const diff = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
       setTimeLeft(diff);
-
-      if (diff === 0) {
-        setError((prev) => prev || 'Booking has expired. Please create a new booking.');
-      }
     };
 
     updateCountdown();
@@ -199,7 +195,7 @@ const PaymentPage = () => {
           size="large"
           startIcon={<Payment />}
           onClick={handlePay}
-          disabled={submitting || booking?.status !== 'PENDING' || (timeLeft !== null && timeLeft === 0)}
+          disabled={submitting || booking?.status !== 'PENDING'}
           sx={{ py: 1.5 }}
         >
           {submitting ? 'Processing...' : `Pay ${formatCurrency(booking?.finalAmount || 0)}`}

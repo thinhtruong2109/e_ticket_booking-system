@@ -1,22 +1,56 @@
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 
+dayjs.extend(utc);
+dayjs.extend(timezone);
 dayjs.extend(relativeTime);
 
+const SERVER_TIMEZONE = 'Asia/Ho_Chi_Minh';
+const HAS_TIMEZONE_SUFFIX_REGEX = /(Z|[+-]\d{2}:?\d{2})$/i;
+
+export const parseApiDateTime = (value) => {
+  if (value === null || value === undefined) {
+    return dayjs(value);
+  }
+
+  if (dayjs.isDayjs(value) || value instanceof Date || typeof value === 'number') {
+    return dayjs(value);
+  }
+
+  if (typeof value === 'string') {
+    const input = value.trim();
+    if (!input) {
+      return dayjs(input);
+    }
+
+    if (HAS_TIMEZONE_SUFFIX_REGEX.test(input)) {
+      return dayjs(input);
+    }
+
+    return dayjs.tz(input, SERVER_TIMEZONE);
+  }
+
+  return dayjs(value);
+};
+
+export const toDateTimeMillis = (value) => parseApiDateTime(value).valueOf();
+
 export const formatDate = (date) => {
-  return dayjs(date).format('DD/MM/YYYY');
+  return parseApiDateTime(date).format('DD/MM/YYYY');
 };
 
 export const formatDateTime = (date) => {
-  return dayjs(date).format('DD/MM/YYYY HH:mm');
+  return parseApiDateTime(date).format('DD/MM/YYYY HH:mm');
 };
 
 export const formatTime = (date) => {
-  return dayjs(date).format('HH:mm');
+  return parseApiDateTime(date).format('HH:mm');
 };
 
 export const formatRelative = (date) => {
-  return dayjs(date).fromNow();
+  return parseApiDateTime(date).fromNow();
 };
 
 export const formatCurrency = (amount) => {

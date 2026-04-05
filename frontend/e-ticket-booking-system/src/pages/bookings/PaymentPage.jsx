@@ -8,13 +8,12 @@ import {
   Button,
   Divider,
   Alert,
-  LinearProgress,
   Chip,
 } from '@mui/material';
 import { Payment, Timer, AccountBalanceWallet } from '@mui/icons-material';
 import { bookingApi, paymentApi } from '../../api';
 import { LoadingScreen, ErrorAlert, PageHeader } from '../../components/common';
-import { formatCurrency, formatDateTime, getErrorMessage } from '../../utils/helpers';
+import { formatCurrency, getErrorMessage, toDateTimeMillis } from '../../utils/helpers';
 
 const PaymentPage = () => {
   const { bookingId } = useParams();
@@ -31,22 +30,35 @@ const PaymentPage = () => {
   }, [bookingId]);
 
   useEffect(() => {
-    if (!booking?.holdExpiresAt) return;
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const expires = new Date(booking.holdExpiresAt).getTime();
-      const diff = Math.max(0, Math.floor((expires - now) / 1000));
+    if (!booking?.holdExpiresAt || booking.status !== 'PENDING') {
+      setTimeLeft(null);
+      return;
+    }
+
+    const expiresAtMs = toDateTimeMillis(booking.holdExpiresAt);
+    if (!Number.isFinite(expiresAtMs)) {
+      setTimeLeft(0);
+      setError('Booking expiration time is invalid. Please refresh and try again.');
+      return;
+    }
+
+    const updateCountdown = () => {
+      const diff = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
       setTimeLeft(diff);
+
       if (diff === 0) {
-        clearInterval(interval);
-        setError('Booking has expired. Please create a new booking.');
+        setError((prev) => prev || 'Booking has expired. Please create a new booking.');
       }
-    }, 1000);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [booking]);
+  }, [booking?.holdExpiresAt, booking?.status]);
 
   const fetchBooking = async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await bookingApi.getById(bookingId);
       setBooking(res.data);
